@@ -50,7 +50,7 @@ src/
 ---
 
 ### Authors
-* Pratul Wadhwa @PratulW5
+* Pratul Wadhwa [@PratulW5](https://github.com/PratulW5)
 
 ---
 

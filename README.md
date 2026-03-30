@@ -54,3 +54,5 @@ src/
 
 ---
 
+### 📄 License
+This project is developed for academic purposes as part of the **DECO3801** course at **The University of Queensland**.

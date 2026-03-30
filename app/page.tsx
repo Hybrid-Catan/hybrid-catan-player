@@ -259,7 +259,7 @@ export default function HybridCatanLanding() {
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10">
               <img
-                src="/apple-touch-icon.png"
+                src="/favicon.ico"
                 alt="Logo"
                 className="w-full h-full object-contain drop-shadow-lg"
               />

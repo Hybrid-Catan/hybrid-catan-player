@@ -1,4 +1,4 @@
-# hybrid-catan-client
+# hybrid-catan-player
 
 ### Description
 The **Hybrid Catan Client** is a real-time web application that allows players to interact with the game, view their resources, perform actions, and visualize the evolving board state. It connects to the backend server via WebSockets to ensure all players are synchronized instantly.

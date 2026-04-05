@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 /* ─────────────────────────────────────────────
    DESIGN TOKENS
@@ -181,6 +182,7 @@ interface Resources {
 
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 export default function HybridCatanLanding() {
+  const router = useRouter();
   const [dice, setDice] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
   const [resources, setResources] = useState<Resources>({ wood: 3, brick: 2, sheep: 1, wheat: 4, ore: 2 });
@@ -280,7 +282,7 @@ export default function HybridCatanLanding() {
             ))}
           </div>
 
-          <HexBtn primary>Join Game</HexBtn>
+          <HexBtn primary onClick={() => router.push('/join')}>Join Game</HexBtn>
         </div>
       </nav>
 
@@ -355,7 +357,7 @@ export default function HybridCatanLanding() {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <HexBtn primary>⚔️ Start a Game</HexBtn>
+            <HexBtn primary onClick={() => router.push('/host')}>⚔️ Start a Game</HexBtn>
             <HexBtn>▶ Watch Demo</HexBtn>
           </div>
 
@@ -766,7 +768,7 @@ export default function HybridCatanLanding() {
             The rest takes care of itself.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <HexBtn primary>⚔️ Host a Game</HexBtn>
+            <HexBtn primary onClick={() => router.push('/host')}>⚔️ Host a Game</HexBtn>
             <HexBtn>📖 Read the Docs</HexBtn>
           </div>
           <div className="mt-12 flex flex-wrap justify-center gap-8 f-cinzel text-[10px] tracking-[0.35em] uppercase text-[#2A3347]">

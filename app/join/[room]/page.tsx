@@ -17,6 +17,12 @@ const MOCK_PLAYERS = [
   { name: 'Sam', color: '#22c55e', ready: false },
 ]
 
+const TAKEN_COLORS = new Set(
+  MOCK_PLAYERS.map(p => COLORS.find(c => c.dot === p.color)?.id).filter(Boolean) as ColorId[]
+)
+
+const DEFAULT_COLOR = (COLORS.find(c => !TAKEN_COLORS.has(c.id)) ?? COLORS[0]).id
+
 function PlayerLobby({ name, dotColor }: { name: string; dotColor: string }) {
   return (
     <div className="rounded-xl border border-[#38BDF8]/20 bg-[#0E1117] overflow-hidden">
@@ -61,7 +67,7 @@ export default function JoinRoomPage() {
   const params = useParams()
   const room = (params.room as string).toUpperCase()
 
-  const [selected, setSelected] = useState<ColorId>('red')
+  const [selected, setSelected] = useState<ColorId>(DEFAULT_COLOR)
   const [name, setName] = useState('')
 
   const selectedColor = COLORS.find(c => c.id === selected)!
@@ -169,17 +175,28 @@ export default function JoinRoomPage() {
                 Choose Your Color
               </label>
               <div className="grid grid-cols-4 gap-2">
-                {COLORS.map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => setSelected(c.id)}
-                    className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center gap-1 transition-all duration-200
-                      ${selected === c.id ? `${c.bg} ${c.border}` : 'bg-[#0E1117] border-[#2A3347] hover:border-[#3A4A5A]'}`}
-                  >
-                    <div className="w-4 h-4 rounded-full" style={{ background: c.dot }} />
-                    <span className="f-cinzel text-[9px] font-bold tracking-widest uppercase text-[#6B7A99]">{c.label}</span>
-                  </button>
-                ))}
+                {COLORS.map(c => {
+                  const taken = TAKEN_COLORS.has(c.id)
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => !taken && setSelected(c.id)}
+                      disabled={taken}
+                      className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center gap-1 transition-all duration-200
+                        ${taken
+                          ? 'bg-[#0E1117] border-[#2A3347] opacity-30 cursor-not-allowed'
+                          : selected === c.id
+                            ? `${c.bg} ${c.border}`
+                            : 'bg-[#0E1117] border-[#2A3347] hover:border-[#3A4A5A]'
+                        }`}
+                    >
+                      <div className="w-4 h-4 rounded-full" style={{ background: c.dot }} />
+                      <span className="f-cinzel text-[9px] font-bold tracking-widest uppercase text-[#6B7A99]">
+                        {taken ? 'Taken' : c.label}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 

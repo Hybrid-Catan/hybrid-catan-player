@@ -25,10 +25,10 @@ const DEFAULT_COLOR = (COLORS.find(c => !TAKEN_COLORS.has(c.id)) ?? COLORS[0]).i
 
 function PlayerLobby({ name, dotColor }: { name: string; dotColor: string }) {
   return (
-    <div className="rounded-xl border border-[#38BDF8]/20 bg-[#0E1117] overflow-hidden">
-      <div className="px-5 py-3 border-b border-[#38BDF8]/10 flex items-center gap-2">
+    <div className="rounded-xl border border-[#C8861A]/20 bg-[#0E1117] overflow-hidden">
+      <div className="px-5 py-3 border-b border-[#C8861A]/15 flex items-center gap-2">
         <span className="w-2 h-2 rounded-full bg-emerald-500 glow-pulse" />
-        <span className="f-cinzel text-[10px] text-[#38BDF8] tracking-[0.3em] uppercase">Waiting for players</span>
+        <span className="f-cinzel text-[11px] text-[#F0C060] tracking-[0.3em] uppercase">Waiting for players</span>
       </div>
       <div className="divide-y divide-[#1A2235]">
         {name.trim().length > 0 && (
@@ -47,15 +47,15 @@ function PlayerLobby({ name, dotColor }: { name: string; dotColor: string }) {
               style={{ background: p.color }}>
               {p.name[0]}
             </div>
-            <span className="f-body text-sm text-[#6B7A99] flex-1">{p.name}</span>
-            <span className={`f-cinzel text-[10px] font-semibold tracking-wide ${p.ready ? 'text-emerald-400' : 'text-[#3A4A5A]'}`}>
+            <span className="f-body text-sm text-[#8A9AB8] flex-1">{p.name}</span>
+            <span className={`f-cinzel text-[10px] font-semibold tracking-wide ${p.ready ? 'text-emerald-400' : 'text-[#4A5875]'}`}>
               {p.ready ? 'Ready' : 'Waiting...'}
             </span>
           </div>
         ))}
         <div className="flex items-center gap-3 px-5 py-3">
           <div className="w-8 h-8 rounded-full border border-dashed border-[#2A3347]" />
-          <span className="f-body text-sm text-[#2A3347]">Open slot</span>
+          <span className="f-body text-sm text-[#4A5875]">Open slot</span>
         </div>
       </div>
     </div>
@@ -75,29 +75,33 @@ export default function JoinRoomPage() {
 
   const handleJoin = () => {
     if (!canJoin) return
-    // TODO: connect to room via WebSocket
+    router.push(`/game/${room}?name=${encodeURIComponent(name.trim())}&color=${encodeURIComponent(selectedColor.dot)}`)
   }
 
   return (
-    <div className="min-h-screen bg-[#0E1117] text-[#F0E6CC]">
+    <div className="min-h-screen bg-[#0A0D14] text-[#F0E6CC]">
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:wght@300;400;600&display=swap');
         .f-title  { font-family: 'Cinzel Decorative', serif; }
         .f-cinzel { font-family: 'Cinzel', serif; }
         .f-body   { font-family: 'Crimson Pro', serif; }
+
         @keyframes glowPulse { 0%,100% { opacity: .5 } 50% { opacity: 1 } }
-        @keyframes dotFade   { 0%,100% { opacity: .03 } 50% { opacity: .08 } }
+        @keyframes dotFade   { 0%,100% { opacity: .06 } 50% { opacity: .18 } }
         .glow-pulse { animation: glowPulse 2.5s ease-in-out infinite; }
         .dot-fade   { animation: dotFade 5s ease-in-out infinite; }
-        .cyan-glow  { text-shadow: 0 0 40px rgba(56,189,248,.6), 0 0 80px rgba(56,189,248,.2); }
-        input:focus { outline: none; border-color: #38BDF8 !important; }
+
+        .amber-glow { text-shadow: 0 0 30px rgba(240,192,96,.7), 0 0 60px rgba(240,192,96,.3), 0 0 100px rgba(240,192,96,.1); }
+        .white-glow { text-shadow: 0 0 20px rgba(255,255,255,.4), 0 0 50px rgba(240,192,96,.2); }
+
+        input:focus { outline: none; border-color: #C8861A !important; box-shadow: 0 0 0 3px rgba(200,134,26,.12); }
         input::placeholder { color: #2A3347; }
       `}</style>
 
       <div className="flex min-h-screen">
 
-        <div className="hidden lg:flex flex-col justify-between flex-1 px-16 py-12 border-r border-[#38BDF8]/20 bg-[#090D13] relative overflow-hidden">
+        <div className="hidden lg:flex flex-col justify-between flex-1 px-16 py-12 border-r border-[#C8861A]/15 bg-[#070A10] relative overflow-hidden">
 
           <svg className="absolute inset-0 w-full h-full pointer-events-none dot-fade" xmlns="http://www.w3.org/2000/svg">
             {Array.from({ length: 12 }, (_, row) =>
@@ -107,7 +111,7 @@ export default function JoinRoomPage() {
                   cx={col * 100 + 50}
                   cy={row * 80 + 40}
                   r="1.5"
-                  fill="#38BDF8"
+                  fill="#C8861A"
                 />
               ))
             )}
@@ -122,11 +126,15 @@ export default function JoinRoomPage() {
           </div>
 
           <div className="relative z-10">
-            <p className="f-cinzel text-[#38BDF8] text-xs tracking-[0.4em] uppercase mb-4">Room {room}</p>
-            <h1 className="f-title text-5xl text-[#F0E6CC] leading-tight cyan-glow mb-6">
-              Take Your<br />Seat
+            <p className="f-cinzel text-[#F0C060] text-sm tracking-[0.5em] uppercase mb-5 flex items-center gap-2">
+              <span className="inline-block w-8 h-px bg-[#F0C060]/60" />
+              Room {room}
+            </p>
+            <h1 className="f-title text-6xl text-white leading-[1.1] white-glow mb-5">
+              Take Your<br />
+              <span className="amber-glow text-[#F0C060]">Seat</span>
             </h1>
-            <p className="f-body text-[#6B7A99] text-lg leading-relaxed max-w-sm mb-10">
+            <p className="f-body text-[#8A9AB8] text-lg leading-relaxed max-w-sm mb-10">
               Pick your color and enter your name.
               Your spot will appear in the lobby instantly.
             </p>
@@ -137,17 +145,17 @@ export default function JoinRoomPage() {
           </div>
 
           <div className="flex gap-6 relative z-10">
-            <span className="f-cinzel text-[10px] text-[#38BDF8]/20 tracking-[0.3em] uppercase">Open Source</span>
-            <span className="f-cinzel text-[10px] text-[#38BDF8]/20 tracking-[0.3em] uppercase">Local LAN or Cloud</span>
-            <span className="f-cinzel text-[10px] text-[#38BDF8]/20 tracking-[0.3em] uppercase">No Account Required</span>
+            {['Open Source', 'Local LAN or Cloud', 'No Account Required'].map(t => (
+              <span key={t} className="f-cinzel text-[11px] text-[#F0C060]/70 tracking-[0.3em] uppercase">{t}</span>
+            ))}
           </div>
         </div>
 
-        <div className="flex flex-col justify-center w-full lg:w-[460px] lg:flex-shrink-0 px-4 lg:px-12 py-10">
+        <div className="flex flex-col justify-center w-full lg:w-[460px] lg:flex-shrink-0 px-4 lg:px-12 py-10 bg-[#0A0D14]">
 
           <button
             onClick={() => router.push('/join')}
-            className="f-cinzel flex items-center gap-2 text-[#6B7A99] hover:text-[#F0E6CC] text-xs tracking-widest uppercase transition-colors duration-200 mb-10"
+            className="f-cinzel flex items-center gap-2 text-[#8A9AB8] hover:text-[#F0E6CC] text-sm tracking-widest uppercase transition-colors duration-200 mb-12"
           >
             <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round" />
@@ -164,14 +172,18 @@ export default function JoinRoomPage() {
           </div>
 
           <div className="mb-8">
-            <div className="f-cinzel text-[10px] text-[#38BDF8] tracking-[0.3em] uppercase mb-1">Room {room}</div>
-            <h1 className="f-title text-3xl text-[#F0E6CC] cyan-glow mb-2">Join Game</h1>
-            <p className="f-body text-[#6B7A99] text-sm">Choose your color and enter your name</p>
+            <p className="f-cinzel text-[11px] text-[#F0C060]/80 tracking-[0.4em] uppercase mb-2 flex items-center gap-2">
+              <span className="inline-block w-5 h-px bg-[#F0C060]/40" />
+              Room {room}
+            </p>
+            <h1 className="f-title text-3xl text-white mb-2">Join Game</h1>
+            <p className="f-body text-[#8A9AB8] text-base">Choose your color and enter your name</p>
           </div>
 
-          <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-6 mb-4">
+          {/* color + name form */}
+          <div className="rounded-xl border border-[#1E2D42] bg-[#0E1520] p-6 mb-4">
             <div className="mb-6">
-              <label className="f-cinzel block text-[10px] text-[#6B7A99] tracking-[0.3em] uppercase mb-3">
+              <label className="f-cinzel block text-[11px] text-[#F0C060] tracking-[0.35em] uppercase mb-3">
                 Choose Your Color
               </label>
               <div className="grid grid-cols-4 gap-2">
@@ -191,7 +203,7 @@ export default function JoinRoomPage() {
                         }`}
                     >
                       <div className="w-4 h-4 rounded-full" style={{ background: c.dot }} />
-                      <span className="f-cinzel text-[9px] font-bold tracking-widest uppercase text-[#6B7A99]">
+                      <span className="f-cinzel text-[10px] font-bold tracking-widest uppercase text-[#8A9AB8]">
                         {taken ? 'Taken' : c.label}
                       </span>
                     </button>
@@ -201,7 +213,7 @@ export default function JoinRoomPage() {
             </div>
 
             <div>
-              <label className="f-cinzel block text-[10px] text-[#6B7A99] tracking-[0.3em] uppercase mb-2">
+              <label className="f-cinzel block text-[11px] text-[#F0C060] tracking-[0.35em] uppercase mb-2">
                 Your Name
               </label>
               <input
@@ -209,24 +221,25 @@ export default function JoinRoomPage() {
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="e.g. Alex"
-                className="w-full bg-[#0E1117] border border-[#2A3347] rounded-lg px-4 py-3 text-[#F0E6CC] text-sm transition-colors duration-200"
+                className="w-full bg-[#070A10] border border-[#1E2D42] rounded-lg px-4 py-3 text-[#F0E6CC] text-sm transition-all duration-200"
               />
             </div>
           </div>
 
+          {/* join button */}
           <button
             onClick={handleJoin}
             disabled={!canJoin}
-            className={`f-cinzel w-full py-4 rounded-xl text-sm font-bold tracking-[0.2em] uppercase transition-all duration-300 mb-4
+            className={`f-cinzel w-full py-4 rounded-xl text-sm font-bold tracking-[0.2em] uppercase transition-all duration-500 ease-out mb-4
               ${canJoin
-                ? 'bg-gradient-to-br from-[#38BDF8] to-[#0284C7] text-[#0E1117] hover:from-[#7DD3FC] hover:to-[#0EA5E9] hover:scale-[1.02]'
-                : 'bg-[#161C27] text-[#3A4A5A] border border-[#2A3347] cursor-not-allowed'
+                ? 'bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#060A10] hover:from-[#E0A030] hover:to-[#B87818] hover:shadow-[0_4px_20px_rgba(200,134,26,0.45)] active:opacity-80'
+                : 'bg-[#0E1520] text-[#2A3A50] border border-[#1E2D42] cursor-not-allowed'
               }`}
           >
-            Join Game
+            Join Game →
           </button>
 
-          <div className="lg:hidden">
+          <div className="lg:hidden mt-4">
             <PlayerLobby name={name} dotColor={selectedColor.dot} />
           </div>
 

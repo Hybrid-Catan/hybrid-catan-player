@@ -24,19 +24,19 @@ const MOCK_STATE = {
     name: 'Alex',
     color: '#ef4444',
     vp: 2,
-    resources: { wood: 2, brick: 1, sheep: 3, wheat: 1, ore: 0 } as Record<ResourceId, number>,
+    resources: { wood: 5, brick: 1, sheep: 4, wheat: 1, ore: 0 } as Record<ResourceId, number>,
   },
   turn: {
     player: 'Jordan',
     color: '#3b82f6',
-    isMyTurn: false,
+    isMyTurn: true,
     phase: 'action' as 'roll' | 'action',
     dice: [3, 5] as [number, number],
   },
   players: [
-    { name: 'Jordan', color: '#3b82f6', vp: 3, cards: 4 },
-    { name: 'Sam', color: '#22c55e', vp: 2, cards: 2 },
-    { name: 'Mia', color: '#f97316', vp: 1, cards: 1 },
+    { name: 'Jordan', color: '#3b82f6', vp: 3, cards: 7 },
+    { name: 'Sam', color: '#22c55e', vp: 2, cards: 5 },
+    { name: 'Mia', color: '#f97316', vp: 1, cards: 4 },
   ],
 }
 
@@ -69,14 +69,39 @@ export default function GamePage() {
   const searchParams = useSearchParams()
   const room = (params.room as string).toUpperCase()
   const { turn } = MOCK_STATE
+  const [resources, setResources] = useState<Record<ResourceId, number>>(MOCK_STATE.me.resources)
   const me = {
     ...MOCK_STATE.me,
     name: searchParams.get('name') ?? MOCK_STATE.me.name,
     color: searchParams.get('color') ?? MOCK_STATE.me.color,
+    resources,
   }
   const players = MOCK_STATE.players.filter(p => p.color !== me.color)
 
   const [buildOpen, setBuildOpen] = useState(false)
+  const [tradeOpen, setTradeOpen] = useState(false)
+  const [tradeMode, setTradeMode] = useState<'bank' | 'player'>('bank')
+  const [bankGive, setBankGive] = useState<ResourceId | null>(null)
+  const [bankGet, setBankGet] = useState<ResourceId | null>(null)
+  const [offerGive, setOfferGive] = useState<Partial<Record<ResourceId, number>>>({})
+  const [offerRequest, setOfferRequest] = useState<Partial<Record<ResourceId, number>>>({})
+  const [targetPlayer, setTargetPlayer] = useState<string | null>(null)
+  const [sentOffer, setSentOffer] = useState<string | null>(null)
+
+  function toggleTrade() {
+    setTradeOpen(v => !v)
+    setBuildOpen(false)
+  }
+  function toggleBuild() {
+    setBuildOpen(v => !v)
+    setTradeOpen(false)
+  }
+
+  function adjustOffer(map: Partial<Record<ResourceId, number>>, set: (v: Partial<Record<ResourceId, number>>) => void, id: ResourceId, delta: number, max?: number) {
+    const cur = map[id] ?? 0
+    const next = Math.min(Math.max(cur + delta, 0), max ?? Infinity)
+    set({ ...map, [id]: next })
+  }
 
   const totalCards = Object.values(me.resources).reduce((a, b) => a + b, 0)
   const diceSum = turn.dice[0] + turn.dice[1]
@@ -103,24 +128,192 @@ export default function GamePage() {
 
   const playerList = (
     <div className="space-y-2">
-      {players.map(p => {
-        const isActive = turn.player === p.name
-        return (
-          <div key={p.name}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 bg-[#0A0D14]"
-            style={{ borderColor: isActive ? `${p.color}99` : '#161C27' }}>
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0"
-              style={{ background: p.color }}>
-              {p.name[0]}
-            </div>
-            <span className="f-body text-base flex-1" style={{ color: isActive ? '#F0E6CC' : '#8A9AB8' }}>
-              {p.name}
-            </span>
-            <span className="f-cinzel text-xs text-[#8A9AB8]">{p.cards} cards</span>
-            <span className="f-cinzel text-sm font-bold text-[#C8861A]">{p.vp} VP</span>
+      {players.map(p => (
+        <div key={p.name}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 bg-[#0A0D14]"
+          style={{ borderColor: '#161C27' }}>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0"
+            style={{ background: p.color }}>
+            {p.name[0]}
           </div>
-        )
-      })}
+          <span className="f-body text-base flex-1" style={{ color: '#8A9AB8' }}>
+            {p.name}
+          </span>
+          <span className="f-cinzel text-xs text-[#8A9AB8]">{p.cards} cards</span>
+          <span className="f-cinzel text-sm font-bold text-[#C8861A]">{p.vp} VP</span>
+        </div>
+      ))}
+    </div>
+  )
+
+  const bankCanTrade = bankGive !== null && bankGet !== null && me.resources[bankGive] >= 4
+
+  const tradePanel = tradeOpen && (
+    <div className="slide-up space-y-4 pt-4 border-t border-[#2A3347]">
+      <div className="flex gap-1 p-1 bg-[#0A0D14] rounded-lg">
+        {(['bank', 'player'] as const).map(mode => (
+          <button key={mode} onClick={() => setTradeMode(mode)}
+            className={`flex-1 py-2 rounded-md f-cinzel text-xs tracking-widest uppercase transition-all
+              ${tradeMode === mode ? 'bg-[#2A3347] text-[#F0E6CC]' : 'text-[#6B7A99] hover:text-[#8A9AB8]'}`}>
+            {mode === 'bank' ? 'Bank (4:1)' : 'Player'}
+          </button>
+        ))}
+      </div>
+
+      {tradeMode === 'bank' ? (
+        <div className="space-y-3">
+          <div>
+            <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">You Give ×4</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {RESOURCES.map(r => {
+                const enough = me.resources[r.id] >= 4
+                const selected = bankGive === r.id
+                return (
+                  <button key={r.id} disabled={!enough}
+                    onClick={() => { setBankGive(selected ? null : r.id); if (bankGet === r.id) setBankGet(null) }}
+                    className={`flex flex-col items-center gap-1 py-2.5 rounded-lg border transition-all
+                      ${selected ? 'border-[#C8861A] bg-[#C8861A]/15' : enough ? 'border-[#2A3347] bg-[#0A0D14] hover:border-[#3A4357]' : 'border-[#161C27] bg-[#090C12] opacity-30 cursor-not-allowed'}`}>
+                    <span className="text-lg leading-none">{r.emoji}</span>
+                    <span className="f-cinzel text-sm font-bold" style={{ color: enough ? r.color : '#2A3347' }}>
+                      {me.resources[r.id]}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">You Get ×1</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {RESOURCES.map(r => {
+                const disabled = r.id === bankGive
+                const selected = bankGet === r.id
+                return (
+                  <button key={r.id} disabled={disabled}
+                    onClick={() => setBankGet(selected ? null : r.id)}
+                    className={`flex flex-col items-center gap-1 py-2.5 rounded-lg border transition-all
+                      ${selected ? 'border-[#38BDF8] bg-[#38BDF8]/10' : disabled ? 'border-[#161C27] bg-[#090C12] opacity-30 cursor-not-allowed' : 'border-[#2A3347] bg-[#0A0D14] hover:border-[#3A4357]'}`}>
+                    <span className="text-lg leading-none">{r.emoji}</span>
+                    <span className="f-cinzel text-[10px] text-[#8A9AB8]">{r.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <button disabled={!bankCanTrade}
+            onClick={() => {
+              if (!bankGive || !bankGet) return
+              setResources(prev => ({
+                ...prev,
+                [bankGive]: prev[bankGive] - 4,
+                [bankGet]: prev[bankGet] + 1,
+              }))
+              setBankGive(null)
+              setBankGet(null)
+              setTradeOpen(false)
+            }}
+            className={`w-full py-3 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase transition-all
+              ${bankCanTrade ? 'bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#0E1117] active:scale-[0.98]' : 'bg-[#0A0D14] border border-[#161C27] text-[#2A3347] cursor-not-allowed'}`}>
+            Confirm Trade
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">You Offer</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {RESOURCES.map(r => {
+                const given = offerGive[r.id] ?? 0
+                const maxGive = me.resources[r.id]
+                return (
+                  <div key={r.id} className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg border border-[#2A3347] bg-[#0A0D14]">
+                    <span className="text-base leading-none">{r.emoji}</span>
+                    <span className="f-cinzel text-sm font-bold" style={{ color: given > 0 ? r.color : '#2A3347' }}>{given}</span>
+                    <div className="flex gap-1">
+                      <button onClick={() => adjustOffer(offerGive, setOfferGive, r.id, -1)}
+                        disabled={given === 0}
+                        className="w-5 h-5 rounded text-xs bg-[#161C27] text-[#8A9AB8] disabled:opacity-30 hover:bg-[#2A3347]">−</button>
+                      <button onClick={() => adjustOffer(offerGive, setOfferGive, r.id, 1, maxGive)}
+                        disabled={given >= maxGive}
+                        className="w-5 h-5 rounded text-xs bg-[#161C27] text-[#8A9AB8] disabled:opacity-30 hover:bg-[#2A3347]">+</button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">You Request</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {RESOURCES.map(r => {
+                const requested = offerRequest[r.id] ?? 0
+                return (
+                  <div key={r.id} className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg border border-[#2A3347] bg-[#0A0D14]">
+                    <span className="text-base leading-none">{r.emoji}</span>
+                    <span className="f-cinzel text-sm font-bold" style={{ color: requested > 0 ? r.color : '#2A3347' }}>{requested}</span>
+                    <div className="flex gap-1">
+                      <button onClick={() => adjustOffer(offerRequest, setOfferRequest, r.id, -1)}
+                        disabled={requested === 0}
+                        className="w-5 h-5 rounded text-xs bg-[#161C27] text-[#8A9AB8] disabled:opacity-30 hover:bg-[#2A3347]">−</button>
+                      <button onClick={() => adjustOffer(offerRequest, setOfferRequest, r.id, 1, targetPlayer ? players.find(p => p.name === targetPlayer)?.cards ?? 0 : 0)}
+                        disabled={requested >= (targetPlayer ? players.find(p => p.name === targetPlayer)?.cards ?? 0 : 0)}
+                        className="w-5 h-5 rounded text-xs bg-[#161C27] text-[#8A9AB8] disabled:opacity-30 hover:bg-[#2A3347]">+</button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">Send To</p>
+            <div className="flex gap-2">
+              {players.map(p => (
+                <button key={p.name} onClick={() => {
+                  if (targetPlayer !== p.name) {
+                    setOfferGive({})
+                    setOfferRequest({})
+                  }
+                  setTargetPlayer(targetPlayer === p.name ? null : p.name)
+                }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all f-body text-sm
+                    ${targetPlayer === p.name ? 'border-[#38BDF8]/60 bg-[#38BDF8]/10 text-[#F0E6CC]' : 'border-[#2A3347] bg-[#0A0D14] text-[#8A9AB8] hover:border-[#3A4357]'}`}>
+                  <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ background: p.color }} />
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {sentOffer ? (
+            <div className="flex items-center justify-center gap-2 py-3 rounded-xl border border-[#38BDF8]/30 bg-[#38BDF8]/5">
+              <span className="f-cinzel text-sm text-[#38BDF8] tracking-wide">Offer sent to {sentOffer}</span>
+            </div>
+          ) : (() => {
+            const canSend = !!targetPlayer && Object.values(offerGive).some(v => v > 0) && Object.values(offerRequest).some(v => v > 0)
+            return (
+              <button disabled={!canSend}
+                onClick={() => {
+                  setSentOffer(targetPlayer)
+                  setTimeout(() => {
+                    setSentOffer(null)
+                    setOfferGive({})
+                    setOfferRequest({})
+                    setTargetPlayer(null)
+                    setTradeOpen(false)
+                  }, 2000)
+                }}
+                className={`w-full py-3 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase transition-all
+                  ${canSend ? 'bg-gradient-to-br from-[#38BDF8] to-[#0284C7] text-[#0E1117] active:scale-[0.98]' : 'bg-[#0A0D14] border border-[#161C27] text-[#2A3347] cursor-not-allowed'}`}>
+                Send Offer
+              </button>
+            )
+          })()}
+        </div>
+      )}
     </div>
   )
 
@@ -154,7 +347,7 @@ export default function GamePage() {
         </button>
       ) : (
         <>
-          <button onClick={() => setBuildOpen(v => !v)} disabled={!turn.isMyTurn}
+          <button onClick={toggleBuild} disabled={!turn.isMyTurn}
             className={`flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase transition-all duration-200
               ${!turn.isMyTurn
                 ? 'bg-[#0A0D14] border border-[#161C27] text-[#2A3347] cursor-not-allowed'
@@ -164,11 +357,13 @@ export default function GamePage() {
               }`}>
             Build
           </button>
-          <button disabled={!turn.isMyTurn}
+          <button onClick={toggleTrade} disabled={!turn.isMyTurn}
             className={`flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase transition-all duration-200
-              ${turn.isMyTurn
-                ? 'bg-[#161C27] border border-[#2A3347] text-[#F0E6CC] hover:border-[#38BDF8]/40 active:scale-[0.98]'
-                : 'bg-[#0A0D14] border border-[#161C27] text-[#2A3347] cursor-not-allowed'
+              ${!turn.isMyTurn
+                ? 'bg-[#0A0D14] border border-[#161C27] text-[#2A3347] cursor-not-allowed'
+                : tradeOpen
+                  ? 'bg-[#38BDF8]/10 border border-[#38BDF8]/50 text-[#F0E6CC] active:scale-[0.98]'
+                  : 'bg-[#161C27] border border-[#2A3347] text-[#F0E6CC] hover:border-[#38BDF8]/40 active:scale-[0.98]'
               }`}>
             Trade
           </button>
@@ -248,6 +443,7 @@ export default function GamePage() {
         </div>
 
         {buildOpen && <div className="px-5">{buildPanel}</div>}
+        {tradeOpen && <div className="px-5">{tradePanel}</div>}
 
         <div className="px-5 pb-6">{actionBar}</div>
       </div>
@@ -345,6 +541,7 @@ export default function GamePage() {
               <div className="flex-1" />
 
               {buildPanel}
+              {tradePanel}
               {actionBar}
             </div>
           </div>

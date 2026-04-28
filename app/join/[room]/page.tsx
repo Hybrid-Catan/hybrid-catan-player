@@ -4,26 +4,26 @@ import { useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 
 const COLORS = [
-  { id: 'red', label: 'Red', dot: '#ef4444', bg: 'bg-red-500/20', border: 'border-red-500/60' },
-  { id: 'blue', label: 'Blue', dot: '#3b82f6', bg: 'bg-blue-500/20', border: 'border-blue-500/60' },
-  { id: 'green', label: 'Green', dot: '#22c55e', bg: 'bg-emerald-500/20', border: 'border-emerald-500/60' },
-  { id: 'orange', label: 'Orange', dot: '#f97316', bg: 'bg-orange-500/20', border: 'border-orange-500/60' },
+  { id: 'RED',    label: 'Red',    dot: '#ef4444', bg: 'bg-red-500/20',    border: 'border-red-500/60' },
+  { id: 'BLUE',   label: 'Blue',   dot: '#3b82f6', bg: 'bg-blue-500/20',   border: 'border-blue-500/60' },
+  { id: 'WHITE',  label: 'White',  dot: '#f0e6cc', bg: 'bg-stone-300/20',  border: 'border-stone-300/60' },
+  { id: 'ORANGE', label: 'Orange', dot: '#f97316', bg: 'bg-orange-500/20', border: 'border-orange-500/60' },
 ] as const
 
 type ColorId = typeof COLORS[number]['id']
 
 const MOCK_PLAYERS = [
-  { name: 'Jordan', color: '#3b82f6', ready: true },
-  { name: 'Sam', color: '#22c55e', ready: false },
+  { name: 'Jordan', color: 'BLUE' as ColorId,   ready: true  },
+  { name: 'Sam',    color: 'WHITE' as ColorId,   ready: true  },
+  { name: 'Mia',    color: 'ORANGE' as ColorId,  ready: false },
 ]
 
-const TAKEN_COLORS = new Set(
-  MOCK_PLAYERS.map(p => COLORS.find(c => c.dot === p.color)?.id).filter(Boolean) as ColorId[]
-)
+const TAKEN_COLORS = new Set(MOCK_PLAYERS.map(p => p.color))
 
 const DEFAULT_COLOR = (COLORS.find(c => !TAKEN_COLORS.has(c.id)) ?? COLORS[0]).id
 
-function PlayerLobby({ name, dotColor }: { name: string; dotColor: string }) {
+function PlayerLobby({ name, colorId }: { name: string; colorId: ColorId }) {
+  const dotColor = COLORS.find(c => c.id === colorId)!.dot
   return (
     <div className="rounded-xl border border-[#C8861A]/20 bg-[#0E1117] overflow-hidden">
       <div className="px-5 py-3 border-b border-[#C8861A]/15 flex items-center gap-2">
@@ -44,7 +44,7 @@ function PlayerLobby({ name, dotColor }: { name: string; dotColor: string }) {
         {MOCK_PLAYERS.map(p => (
           <div key={p.name} className="flex items-center gap-3 px-5 py-3">
             <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white"
-              style={{ background: p.color }}>
+              style={{ background: COLORS.find(c => c.id === p.color)!.dot }}>
               {p.name[0]}
             </div>
             <span className="f-body text-sm text-[#8A9AB8] flex-1">{p.name}</span>
@@ -75,7 +75,7 @@ export default function JoinRoomPage() {
 
   const handleJoin = () => {
     if (!canJoin) return
-    router.push(`/game/${room}?name=${encodeURIComponent(name.trim())}&color=${encodeURIComponent(selectedColor.dot)}`)
+    router.push(`/game/${room}?name=${encodeURIComponent(name.trim())}&color=${selected}`)
   }
 
   return (
@@ -140,7 +140,7 @@ export default function JoinRoomPage() {
             </p>
 
             <div className="max-w-sm">
-              <PlayerLobby name={name} dotColor={selectedColor.dot} />
+              <PlayerLobby name={name} colorId={selected} />
             </div>
           </div>
 
@@ -240,7 +240,7 @@ export default function JoinRoomPage() {
           </button>
 
           <div className="lg:hidden mt-4">
-            <PlayerLobby name={name} dotColor={selectedColor.dot} />
+            <PlayerLobby name={name} colorId={selected} />
           </div>
 
         </div>

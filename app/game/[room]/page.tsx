@@ -34,56 +34,56 @@ const MOCK_DICE: [number, number] = [3, 5]
 const MOCK_GAME_STATE: GameState = {
   gameId: 'mock-game-1',
   status: 'IN_PROGRESS',
-  phase: 'TRADE',
+  phase: 'SETUP_1',
   dice: { sum: MOCK_DICE[0] + MOCK_DICE[1] },
   players: [
     {
       playerId: MY_PLAYER_ID,
       name: 'Alex',
       color: 'RED',
-      victoryPoints: 2,
-      resources: { WOOD: 5, BRICK: 1, WOOL: 4, WHEAT: 1, ORE: 0 },
+      victoryPoints: 0,
+      resources: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
       developmentCards: { KNIGHT: 0, MONOPOLY: 0, ROAD_BUILDING: 0, INVENTION: 0, VICTORY_POINT: 0 },
-      pieces: { settlementsPlaced: 2, citiesPlaced: 0, roadsPlaced: 2 },
-      achievements: { hasLongestRoad: false, longestRoadLength: 2, hasLargestArmy: false, armySize: 0 },
+      pieces: { settlementsPlaced: 0, citiesPlaced: 0, roadsPlaced: 0 },
+      achievements: { hasLongestRoad: false, longestRoadLength: 0, hasLargestArmy: false, armySize: 0 },
       portsOwned: [],
-      turnState: { currentPhase: 'TRADE' },
+      turnState: { currentPhase: 'SETUP' },
     },
     {
       playerId: 'player-2',
       name: 'Jordan',
       color: 'BLUE',
-      victoryPoints: 3,
-      resources: { WOOD: 3, BRICK: 2, WOOL: 1, WHEAT: 1, ORE: 0 },
+      victoryPoints: 0,
+      resources: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
       developmentCards: { KNIGHT: 0, MONOPOLY: 0, ROAD_BUILDING: 0, INVENTION: 0, VICTORY_POINT: 0 },
-      pieces: { settlementsPlaced: 2, citiesPlaced: 0, roadsPlaced: 3 },
-      achievements: { hasLongestRoad: false, longestRoadLength: 3, hasLargestArmy: false, armySize: 0 },
+      pieces: { settlementsPlaced: 0, citiesPlaced: 0, roadsPlaced: 0 },
+      achievements: { hasLongestRoad: false, longestRoadLength: 0, hasLargestArmy: false, armySize: 0 },
       portsOwned: [],
-      turnState: { currentPhase: 'TRADE' },
+      turnState: { currentPhase: 'SETUP' },
     },
     {
       playerId: 'player-3',
       name: 'Sam',
       color: 'WHITE',
-      victoryPoints: 2,
-      resources: { WOOD: 1, BRICK: 1, WOOL: 1, WHEAT: 1, ORE: 1 },
+      victoryPoints: 0,
+      resources: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
       developmentCards: { KNIGHT: 0, MONOPOLY: 0, ROAD_BUILDING: 0, INVENTION: 0, VICTORY_POINT: 0 },
-      pieces: { settlementsPlaced: 2, citiesPlaced: 0, roadsPlaced: 2 },
-      achievements: { hasLongestRoad: false, longestRoadLength: 2, hasLargestArmy: false, armySize: 0 },
+      pieces: { settlementsPlaced: 0, citiesPlaced: 0, roadsPlaced: 0 },
+      achievements: { hasLongestRoad: false, longestRoadLength: 0, hasLargestArmy: false, armySize: 0 },
       portsOwned: [],
-      turnState: { currentPhase: 'TRADE' },
+      turnState: { currentPhase: 'SETUP' },
     },
     {
       playerId: 'player-4',
       name: 'Mia',
       color: 'ORANGE',
-      victoryPoints: 1,
-      resources: { WOOD: 1, BRICK: 1, WOOL: 1, WHEAT: 1, ORE: 0 },
+      victoryPoints: 0,
+      resources: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
       developmentCards: { KNIGHT: 0, MONOPOLY: 0, ROAD_BUILDING: 0, INVENTION: 0, VICTORY_POINT: 0 },
-      pieces: { settlementsPlaced: 1, citiesPlaced: 0, roadsPlaced: 2 },
-      achievements: { hasLongestRoad: false, longestRoadLength: 2, hasLargestArmy: false, armySize: 0 },
+      pieces: { settlementsPlaced: 0, citiesPlaced: 0, roadsPlaced: 0 },
+      achievements: { hasLongestRoad: false, longestRoadLength: 0, hasLargestArmy: false, armySize: 0 },
       portsOwned: [],
-      turnState: { currentPhase: 'TRADE' },
+      turnState: { currentPhase: 'SETUP' },
     },
   ],
   bank: {
@@ -128,8 +128,8 @@ export default function GamePage() {
   const searchParams = useSearchParams()
   const room = (params.room as string).toUpperCase()
 
-  const [gameState] = useState<GameState>(MOCK_GAME_STATE)
-  const [dice] = useState<[number, number]>(MOCK_DICE)
+  const [gameState, setGameState] = useState<GameState>(MOCK_GAME_STATE)
+  const [dice, setDice] = useState<[number, number]>(MOCK_DICE)
 
   const currentTurnPlayer = gameState.players[0]
   const isMyTurn = currentTurnPlayer.playerId === MY_PLAYER_ID
@@ -148,6 +148,10 @@ export default function GamePage() {
     victoryPoints: myPlayer.victoryPoints,
     resources,
   }
+
+  const isSetupPhase = gameState.phase === 'SETUP_1' || gameState.phase === 'SETUP_2'
+  const setupPhaseNum = gameState.phase === 'SETUP_2' ? 2 : 1
+  const [setupStep, setSetupStep] = useState<'settlement' | 'road'>('settlement')
 
   const [buildOpen, setBuildOpen] = useState(false)
   const [tradeOpen, setTradeOpen] = useState(false)
@@ -413,7 +417,14 @@ export default function GamePage() {
   const actionBar = (
     <div className="flex gap-2 pt-4 border-t border-[#2A3347]">
       {isMyTurn && gameState.phase === 'ROLL' ? (
-        <button className="flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase
+        <button
+          onClick={() => {
+            const d1 = Math.ceil(Math.random() * 6) as 1|2|3|4|5|6
+            const d2 = Math.ceil(Math.random() * 6) as 1|2|3|4|5|6
+            setDice([d1, d2])
+            setGameState(prev => ({ ...prev, phase: 'TRADE', dice: { sum: d1 + d2 } }))
+          }}
+          className="flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase
           bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#0E1117]
           hover:from-[#E8A52A] hover:to-[#C07E18] active:scale-[0.98] transition-all">
           Roll Dice
@@ -449,6 +460,109 @@ export default function GamePage() {
             End Turn
           </button>
         </>
+      )}
+    </div>
+  )
+
+  const setupInstructionCard = (
+    <div className={`rounded-xl border p-5 text-center space-y-3
+      ${setupStep === 'settlement'
+        ? 'border-[#C8861A]/40 bg-[#C8861A]/10'
+        : 'border-[#38BDF8]/40 bg-[#38BDF8]/10'}`}>
+      <div className="text-4xl">{setupStep === 'settlement' ? '🏘️' : '🛤️'}</div>
+      <p className="f-cinzel text-sm font-bold text-[#F0E6CC]">
+        {setupStep === 'settlement' ? 'Place a Settlement' : 'Place a Road'}
+      </p>
+      <p className="f-body text-sm text-[#8A9AB8]">
+        {setupStep === 'settlement'
+          ? 'Place your settlement token on any valid intersection of the physical board.'
+          : 'Place a road token on any edge adjacent to your new settlement.'}
+      </p>
+    </div>
+  )
+
+  const setupProgress = (
+    <div className="space-y-2">
+      {gameState.players.map(p => {
+        const isCurrentTurnPlayer = p.playerId === currentTurnPlayer.playerId
+        const isMe = p.playerId === MY_PLAYER_ID
+        return (
+          <div key={p.playerId}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 bg-[#0A0D14]"
+            style={{ borderColor: isCurrentTurnPlayer ? `${COLOR_MAP[p.color]}99` : '#161C27' }}>
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0"
+              style={{ background: COLOR_MAP[p.color] }}>
+              {p.name[0]}
+            </div>
+            <span className="f-body text-base flex-1" style={{ color: isMe ? '#F0E6CC' : '#8A9AB8' }}>
+              {isMe ? me.name : p.name}
+              {isMe && <span className="f-cinzel text-[9px] text-[#C8861A] tracking-widest uppercase ml-2">you</span>}
+              {isCurrentTurnPlayer && !isMe && <span className="f-cinzel text-[9px] text-[#38BDF8] tracking-widest uppercase ml-2">placing</span>}
+            </span>
+            <div className="flex items-center gap-3 f-cinzel text-xs">
+              <span style={{ color: p.pieces.settlementsPlaced > 0 ? '#C8861A' : '#2A3347' }}>
+                {p.pieces.settlementsPlaced > 0 ? '🏘️' : '○'} {p.pieces.settlementsPlaced}
+              </span>
+              <span style={{ color: p.pieces.roadsPlaced > 0 ? '#8A9AB8' : '#2A3347' }}>
+                {'—'} {p.pieces.roadsPlaced}
+              </span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  const setupActionBar = (
+    <div className="flex gap-2 pt-4 border-t border-[#2A3347]">
+      {isMyTurn ? (
+        setupStep === 'settlement' ? (
+          <button
+            onClick={() => setSetupStep('road')}
+            className="flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase
+              bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#0E1117] active:scale-[0.98] transition-all">
+            Confirm Settlement ✓
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              setSetupStep('settlement')
+              const resourceTypes = ['WOOD', 'BRICK', 'WOOL', 'WHEAT', 'ORE'] as const
+              const randomResources = () => {
+                const res = { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 }
+                for (let i = 0; i < 3; i++) {
+                  res[resourceTypes[Math.floor(Math.random() * 5)]] += 1
+                }
+                return res
+              }
+              if (gameState.phase === 'SETUP_1') {
+                setGameState(prev => ({ ...prev, phase: 'SETUP_2' }))
+              } else {
+                const myNewResources = randomResources()
+                setResources(myNewResources)
+                setGameState(prev => ({
+                  ...prev,
+                  phase: 'ROLL',
+                  players: prev.players.map(p => ({
+                    ...p,
+                    victoryPoints: 2,
+                    resources: p.playerId === MY_PLAYER_ID ? myNewResources : randomResources(),
+                    pieces: { settlementsPlaced: 2, citiesPlaced: 0, roadsPlaced: 2 },
+                  })),
+                }))
+              }
+            }}
+            className="flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase
+              bg-gradient-to-br from-[#38BDF8] to-[#0284C7] text-[#0E1117] active:scale-[0.98] transition-all">
+            Confirm Road ✓
+          </button>
+        )
+      ) : (
+        <div className="flex-1 py-4 rounded-xl border border-[#2A3347] bg-[#0A0D14] flex items-center justify-center">
+          <span className="f-cinzel text-sm text-[#6B7A99] tracking-[0.15em] uppercase">
+            Waiting for {currentTurnPlayer.name}...
+          </span>
+        </div>
       )}
     </div>
   )
@@ -492,33 +606,51 @@ export default function GamePage() {
                 </p>
             }
             <p className="f-cinzel text-[10px] text-[#6B7A99] tracking-widest uppercase mt-0.5">
-              {gameState.phase === 'ROLL' ? 'Roll to start' : 'Taking action'}
+              {isSetupPhase
+                ? (isMyTurn ? (setupStep === 'settlement' ? 'Place your settlement' : 'Place your road') : 'Placing pieces')
+                : (gameState.phase === 'ROLL' ? 'Roll to start' : 'Taking action')}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Die value={dice[0]} />
-            <Die value={dice[1]} />
-            <span className="f-cinzel text-xl font-black w-7 text-center">{diceSum}</span>
-          </div>
+          {isSetupPhase ? (
+            <span className="f-cinzel text-[10px] tracking-widest uppercase text-[#F0E6CC] border border-[#C8861A]/60 bg-[#C8861A]/15 rounded-lg px-3 py-1.5">
+              Setup {setupPhaseNum}/2
+            </span>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Die value={dice[0]} />
+              <Die value={dice[1]} />
+              <span className="f-cinzel text-xl font-black w-7 text-center">{diceSum}</span>
+            </div>
+          )}
         </div>
 
-        <div className="px-5 pt-5 pb-4">
-          <div className="flex items-baseline justify-between mb-3">
-            <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Resources</span>
-            <span className="f-body text-xs text-[#8A9AB8]">{myTotalCards} cards</span>
-          </div>
-          {resourceGrid}
-        </div>
-
-        <div className="px-5 pb-4 flex-1">
-          <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8] block mb-3">Players</span>
-          {playerList}
-        </div>
-
-        {buildOpen && <div className="px-5">{buildPanel}</div>}
-        {tradeOpen && <div className="px-5">{tradePanel}</div>}
-
-        <div className="px-5 pb-6">{actionBar}</div>
+        {isSetupPhase ? (
+          <>
+            {isMyTurn && <div className="px-5 pt-5 pb-4">{setupInstructionCard}</div>}
+            <div className="px-5 pb-4 flex-1">
+              <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8] block mb-3">Setup Progress</span>
+              {setupProgress}
+            </div>
+            <div className="px-5 pb-6">{setupActionBar}</div>
+          </>
+        ) : (
+          <>
+            <div className="px-5 pt-5 pb-4">
+              <div className="flex items-baseline justify-between mb-3">
+                <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Resources</span>
+                <span className="f-body text-xs text-[#8A9AB8]">{myTotalCards} cards</span>
+              </div>
+              {resourceGrid}
+            </div>
+            <div className="px-5 pb-4 flex-1">
+              <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8] block mb-3">Players</span>
+              {playerList}
+            </div>
+            {buildOpen && <div className="px-5">{buildPanel}</div>}
+            {tradeOpen && <div className="px-5">{tradePanel}</div>}
+            <div className="px-5 pb-6">{actionBar}</div>
+          </>
+        )}
       </div>
 
       {/* Desktop */}
@@ -571,53 +703,84 @@ export default function GamePage() {
                   </p>
               }
               <p className="f-cinzel text-xs text-[#6B7A99] tracking-widest uppercase mt-1">
-                {gameState.phase === 'ROLL' ? 'Roll to start' : 'Taking action'}
+                {isSetupPhase
+                  ? (isMyTurn ? (setupStep === 'settlement' ? 'Place your settlement' : 'Place your road') : 'Placing pieces')
+                  : (gameState.phase === 'ROLL' ? 'Roll to start' : 'Taking action')}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Die value={dice[0]} />
-              <Die value={dice[1]} />
-              <span className="f-cinzel text-3xl font-black w-10 text-center">{diceSum}</span>
-            </div>
+            {isSetupPhase ? (
+              <span className="f-cinzel text-xs tracking-widest uppercase text-[#F0E6CC] border border-[#C8861A]/60 bg-[#C8861A]/15 rounded-lg px-4 py-2">
+                Setup {setupPhaseNum} / 2
+              </span>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Die value={dice[0]} />
+                <Die value={dice[1]} />
+                <span className="f-cinzel text-3xl font-black w-10 text-center">{diceSum}</span>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-[1fr_1.4fr] gap-6 flex-1">
-
-            <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-6 flex flex-col gap-4">
-              <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Standings</span>
-
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 bg-[#0A0D14]"
-                style={{ borderColor: isMyTurn ? `${COLOR_MAP[me.color]}99` : '#161C27' }}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0"
-                  style={{ background: COLOR_MAP[me.color] }}>
-                  {me.name[0]}
-                </div>
-                <span className="f-body text-base flex-1 text-[#F0E6CC]">
-                  {me.name}
-                  <span className="f-cinzel text-[9px] text-[#C8861A] tracking-widest uppercase ml-2">you</span>
+          {isSetupPhase ? (
+            <div className="grid grid-cols-[1fr_1.4fr] gap-6 flex-1">
+              <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-6 flex flex-col gap-4">
+                <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Setup Progress</span>
+                {setupProgress}
+              </div>
+              <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-6 flex flex-col gap-5">
+                <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">
+                  {isMyTurn
+                    ? (setupStep === 'settlement' ? 'Place Settlement' : 'Place Road')
+                    : `Waiting for ${currentTurnPlayer.name}`}
                 </span>
-                <span className="f-cinzel text-xs text-[#8A9AB8]">{myTotalCards} cards</span>
-                <span className="f-cinzel text-sm font-bold text-[#C8861A]">{me.victoryPoints} VP</span>
+                {isMyTurn ? (
+                  <>{setupInstructionCard}</>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center rounded-xl border border-[#2A3347] bg-[#0A0D14]">
+                    <div className="text-center space-y-2">
+                      <div className="text-3xl opacity-30">⏳</div>
+                      <p className="f-cinzel text-xs text-[#6B7A99] tracking-widest uppercase">
+                        {currentTurnPlayer.name} is placing pieces
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <div className="flex-1" />
+                {setupActionBar}
               </div>
-
-              {playerList}
             </div>
-
-            <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-6 flex flex-col gap-5">
-              <div className="flex items-baseline justify-between">
-                <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Resources</span>
-                <span className="f-body text-sm text-[#8A9AB8]">{myTotalCards} cards</span>
+          ) : (
+            <div className="grid grid-cols-[1fr_1.4fr] gap-6 flex-1">
+              <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-6 flex flex-col gap-4">
+                <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Standings</span>
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 bg-[#0A0D14]"
+                  style={{ borderColor: isMyTurn ? `${COLOR_MAP[me.color]}99` : '#161C27' }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0"
+                    style={{ background: COLOR_MAP[me.color] }}>
+                    {me.name[0]}
+                  </div>
+                  <span className="f-body text-base flex-1 text-[#F0E6CC]">
+                    {me.name}
+                    <span className="f-cinzel text-[9px] text-[#C8861A] tracking-widest uppercase ml-2">you</span>
+                  </span>
+                  <span className="f-cinzel text-xs text-[#8A9AB8]">{myTotalCards} cards</span>
+                  <span className="f-cinzel text-sm font-bold text-[#C8861A]">{me.victoryPoints} VP</span>
+                </div>
+                {playerList}
               </div>
-
-              {resourceGrid}
-
-              <div className="flex-1" />
-
-              {buildPanel}
-              {tradePanel}
-              {actionBar}
+              <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-6 flex flex-col gap-5">
+                <div className="flex items-baseline justify-between">
+                  <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Resources</span>
+                  <span className="f-body text-sm text-[#8A9AB8]">{myTotalCards} cards</span>
+                </div>
+                {resourceGrid}
+                <div className="flex-1" />
+                {buildPanel}
+                {tradePanel}
+                {actionBar}
+              </div>
             </div>
-          </div>
+          )}
 
         </div>
       </div>

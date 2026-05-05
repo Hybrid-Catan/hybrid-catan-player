@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import type { GameState, Player } from '@/utils/types'
+import { buildRoad } from "@/lib/api/game";
 
 const MY_PLAYER_ID = 'player-1'
 
@@ -42,7 +43,7 @@ const MOCK_GAME_STATE: GameState = {
       name: 'Alex',
       color: 'RED',
       victoryPoints: 0,
-      resources: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
+      resourceCards: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
       developmentCards: { KNIGHT: 0, MONOPOLY: 0, ROAD_BUILDING: 0, INVENTION: 0, VICTORY_POINT: 0 },
       pieces: { settlementsPlaced: 0, citiesPlaced: 0, roadsPlaced: 0 },
       achievements: { hasLongestRoad: false, longestRoadLength: 0, hasLargestArmy: false, armySize: 0 },
@@ -54,7 +55,7 @@ const MOCK_GAME_STATE: GameState = {
       name: 'Jordan',
       color: 'BLUE',
       victoryPoints: 0,
-      resources: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
+      resourceCards: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
       developmentCards: { KNIGHT: 0, MONOPOLY: 0, ROAD_BUILDING: 0, INVENTION: 0, VICTORY_POINT: 0 },
       pieces: { settlementsPlaced: 0, citiesPlaced: 0, roadsPlaced: 0 },
       achievements: { hasLongestRoad: false, longestRoadLength: 0, hasLargestArmy: false, armySize: 0 },
@@ -66,7 +67,7 @@ const MOCK_GAME_STATE: GameState = {
       name: 'Sam',
       color: 'WHITE',
       victoryPoints: 0,
-      resources: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
+      resourceCards: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
       developmentCards: { KNIGHT: 0, MONOPOLY: 0, ROAD_BUILDING: 0, INVENTION: 0, VICTORY_POINT: 0 },
       pieces: { settlementsPlaced: 0, citiesPlaced: 0, roadsPlaced: 0 },
       achievements: { hasLongestRoad: false, longestRoadLength: 0, hasLargestArmy: false, armySize: 0 },
@@ -78,7 +79,7 @@ const MOCK_GAME_STATE: GameState = {
       name: 'Mia',
       color: 'ORANGE',
       victoryPoints: 0,
-      resources: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
+      resourceCards: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
       developmentCards: { KNIGHT: 0, MONOPOLY: 0, ROAD_BUILDING: 0, INVENTION: 0, VICTORY_POINT: 0 },
       pieces: { settlementsPlaced: 0, citiesPlaced: 0, roadsPlaced: 0 },
       achievements: { hasLongestRoad: false, longestRoadLength: 0, hasLargestArmy: false, armySize: 0 },
@@ -137,7 +138,7 @@ export default function GamePage() {
   const otherPlayers = gameState.players.filter(p => p.playerId !== MY_PLAYER_ID)
 
   const [resources, setResources] = useState<Record<ResourceId, number>>(
-    myPlayer.resources as Record<ResourceId, number>
+    myPlayer.resourceCards as Record<ResourceId, number>
   )
 
   const VALID_COLORS = new Set<Player['color']>(['RED', 'BLUE', 'WHITE', 'ORANGE'])
@@ -166,10 +167,29 @@ export default function GamePage() {
   function toggleTrade() {
     setTradeOpen(v => !v)
     setBuildOpen(false)
+    setGameState(prev => ({
+    ...prev,
+    phase: "TRADE",
+  }))
   }
   function toggleBuild() {
     setBuildOpen(v => !v)
     setTradeOpen(false)
+    setGameState(prev => ({
+    ...prev,
+    phase: "BUILD",
+  }))
+  }
+async function handleBuild(item: string) {
+  let result;
+  if (item === "Road") {
+    result = await buildRoad(gameState);
+  }
+  if (!result.success) {
+    alert(result.error);
+    return;
+  }
+  setGameState(result.data);
   }
 
   function adjustOffer(map: Partial<Record<ResourceId, number>>, set: (v: Partial<Record<ResourceId, number>>) => void, id: ResourceId, delta: number, max?: number) {
@@ -214,7 +234,7 @@ export default function GamePage() {
           <span className="f-body text-base flex-1" style={{ color: '#8A9AB8' }}>
             {p.name}
           </span>
-          <span className="f-cinzel text-xs text-[#8A9AB8]">{totalCards(p.resources)} cards</span>
+          <span className="f-cinzel text-xs text-[#8A9AB8]">{totalCards(p.resourceCards)} cards</span>
           <span className="f-cinzel text-sm font-bold text-[#C8861A]">{p.victoryPoints} VP</span>
         </div>
       ))}
@@ -326,7 +346,7 @@ export default function GamePage() {
               {RESOURCES.map(r => {
                 const requested = offerRequest[r.id] ?? 0
                 const target = otherPlayers.find(p => p.name === targetPlayer)
-                const maxRequest = target ? totalCards(target.resources) : 0
+                const maxRequest = target ? totalCards(target.resourceCards) : 0
                 return (
                   <div key={r.id} className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg border border-[#2A3347] bg-[#0A0D14]">
                     <span className="text-base leading-none">{r.emoji}</span>
@@ -400,7 +420,7 @@ export default function GamePage() {
         const affordable = canAfford(me.resources, cost)
         const costStr = Object.entries(cost).map(([r, n]) => `${n} ${r}`).join(' · ')
         return (
-          <button key={item} disabled={!affordable}
+          <button key={item} disabled={!affordable} onClick={() => handleBuild(item)}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-200
               ${affordable
                 ? 'border-[#C8861A]/40 bg-[#C8861A]/10 hover:bg-[#C8861A]/15 active:scale-[0.98]'

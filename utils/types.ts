@@ -5,7 +5,7 @@ export type Player = {
     "name": string,
     "color": "BLUE" | "RED" | "WHITE" | "ORANGE",
     "victoryPoints": number,
-    "resources": {
+    "resourceCards": {
         "WOOD": number,
         "BRICK": number,
         "WOOL": number,

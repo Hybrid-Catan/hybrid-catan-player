@@ -1,5 +1,5 @@
 'use client'
-
+import { addPlayer } from "@/lib/api/start_game"
 import { useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 
@@ -73,9 +73,29 @@ export default function JoinRoomPage() {
   const selectedColor = COLORS.find(c => c.id === selected)!
   const canJoin = name.trim().length > 0
 
-  const handleJoin = () => {
+const handleJoin = async ()=> {
     if (!canJoin) return
     router.push(`/game/${room}?name=${encodeURIComponent(name.trim())}&color=${selected}`)
+    let gameState = JSON.parse(localStorage.getItem("gameState") || "null");
+
+  // if no game yet → create one
+  if (!gameState) {
+    gameState = {
+      gameId: room,
+      players: [],
+      phase: "INIT",
+      bank: {},
+      tradeState: { trades: [] },
+    };
+  }
+  
+  const res = await addPlayer(gameState, name.trim(), selected);
+  if (!res.success) {
+    alert(res.error);
+    return;
+  }
+  localStorage.setItem("gameState", JSON.stringify(res.data));
+  router.push(`/game/${room}`);
   }
 
   return (

@@ -1,9 +1,8 @@
 'use client'
-
 import { useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import type { GameState, Player } from '@/utils/types'
-import { buildRoad } from "@/lib/api/game";
+import { buildRoad } from "@/lib/api/buildRoad";
 
 const MY_PLAYER_ID = 'player-1'
 

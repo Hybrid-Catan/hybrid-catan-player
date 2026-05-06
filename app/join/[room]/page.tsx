@@ -1,29 +1,30 @@
 'use client'
-import { addPlayer } from "@/lib/api/start_game"
-import { useState } from 'react'
+
+import { useEffect, useState } from "react";
 import { useRouter, useParams } from 'next/navigation'
+import { setPhaseToSetup1 } from "@/lib/api/game/start_game"
 
 const COLORS = [
-  { id: 'RED',    label: 'Red',    dot: '#ef4444', bg: 'bg-red-500/20',    border: 'border-red-500/60' },
-  { id: 'BLUE',   label: 'Blue',   dot: '#3b82f6', bg: 'bg-blue-500/20',   border: 'border-blue-500/60' },
-  { id: 'WHITE',  label: 'White',  dot: '#f0e6cc', bg: 'bg-stone-300/20',  border: 'border-stone-300/60' },
+  { id: 'RED', label: 'Red', dot: '#ef4444', bg: 'bg-red-500/20', border: 'border-red-500/60' },
+  { id: 'BLUE', label: 'Blue', dot: '#3b82f6', bg: 'bg-blue-500/20', border: 'border-blue-500/60' },
+  { id: 'WHITE', label: 'White', dot: '#f0e6cc', bg: 'bg-stone-300/20', border: 'border-stone-300/60' },
   { id: 'ORANGE', label: 'Orange', dot: '#f97316', bg: 'bg-orange-500/20', border: 'border-orange-500/60' },
 ] as const
 
 type ColorId = typeof COLORS[number]['id']
 
-const MOCK_PLAYERS = [
-  { name: 'Jordan', color: 'BLUE' as ColorId,   ready: true  },
-  { name: 'Sam',    color: 'WHITE' as ColorId,   ready: true  },
-  { name: 'Mia',    color: 'ORANGE' as ColorId,  ready: false },
-]
+// const MOCK_PLAYERS = [
+//   { name: 'Jordan', color: 'BLUE' as ColorId,   ready: true  },
+//   { name: 'Sam',    color: 'WHITE' as ColorId,   ready: true  },
+//   { name: 'Mia',    color: 'ORANGE' as ColorId,  ready: false },
+// ]
 
-const TAKEN_COLORS = new Set(MOCK_PLAYERS.map(p => p.color))
+// const TAKEN_COLORS = new Set(MOCK_PLAYERS.map(p => p.color))
 
-const DEFAULT_COLOR = (COLORS.find(c => !TAKEN_COLORS.has(c.id)) ?? COLORS[0]).id
+// const DEFAULT_COLOR = (COLORS.find(c => !TAKEN_COLORS.has(c.id)) ?? COLORS[0]).id
 
-function PlayerLobby({ name, colorId }: { name: string; colorId: ColorId }) {
-  const dotColor = COLORS.find(c => c.id === colorId)!.dot
+function PlayerLobby({ gameState, name, colorId }: any) {
+  const dotColor = COLORS.find(c => c.id === colorId)?.dot || '#fff'
   return (
     <div className="rounded-xl border border-[#C8861A]/20 bg-[#0E1117] overflow-hidden">
       <div className="px-5 py-3 border-b border-[#C8861A]/15 flex items-center gap-2">
@@ -31,28 +32,50 @@ function PlayerLobby({ name, colorId }: { name: string; colorId: ColorId }) {
         <span className="f-cinzel text-[11px] text-[#F0C060] tracking-[0.3em] uppercase">Waiting for players</span>
       </div>
       <div className="divide-y divide-[#1A2235]">
-        {name.trim().length > 0 && (
+
+        {/* YOU */}
+        {name?.trim()?.length > 0 && (
           <div className="flex items-center gap-3 px-5 py-3">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white"
-              style={{ background: dotColor }}>
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white"
+              style={{ background: dotColor }}
+            >
               {name[0].toUpperCase()}
             </div>
-            <span className="f-body text-sm text-[#F0E6CC] font-semibold flex-1">{name} (You)</span>
-            <span className="f-cinzel text-[10px] text-emerald-400 font-semibold tracking-wide">Ready</span>
-          </div>
-        )}
-        {MOCK_PLAYERS.map(p => (
-          <div key={p.name} className="flex items-center gap-3 px-5 py-3">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white"
-              style={{ background: COLORS.find(c => c.id === p.color)!.dot }}>
-              {p.name[0]}
-            </div>
-            <span className="f-body text-sm text-[#8A9AB8] flex-1">{p.name}</span>
-            <span className={`f-cinzel text-[10px] font-semibold tracking-wide ${p.ready ? 'text-emerald-400' : 'text-[#4A5875]'}`}>
-              {p.ready ? 'Ready' : 'Waiting...'}
+            <span className="f-body text-sm text-[#F0E6CC] font-semibold flex-1">
+              {name} (You)
+            </span>
+            <span className="f-cinzel text-[10px] text-emerald-400">
+              Ready
             </span>
           </div>
-        ))}
+        )}
+
+        {/* REAL PLAYERS */}
+        {gameState?.players?.map((p: any) => {
+          const color = COLORS.find(c => c.id === p.color)?.dot || '#fff'
+
+          return (
+            <div key={p.playerId} className="flex items-center gap-3 px-5 py-3">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white"
+                style={{ background: color }}
+              >
+                {p.name[0]}
+              </div>
+
+              <span className="f-body text-sm text-[#F0E6CC] flex-1">
+                {p.name}
+              </span>
+
+              <span className="f-cinzel text-[10px] text-emerald-400">
+                Joined
+              </span>
+            </div>
+          )
+        })}
+
+        {/* EMPTY SLOT */}
         <div className="flex items-center gap-3 px-5 py-3">
           <div className="w-8 h-8 rounded-full border border-dashed border-[#2A3347]" />
           <span className="f-body text-sm text-[#4A5875]">Open slot</span>
@@ -67,35 +90,72 @@ export default function JoinRoomPage() {
   const params = useParams()
   const room = (params.room as string).toUpperCase()
 
-  const [selected, setSelected] = useState<ColorId>(DEFAULT_COLOR)
+  const [selected, setSelected] = useState<ColorId>('RED')
   const [name, setName] = useState('')
+  const [gameState, setGameState] = useState<any>(null)
 
   const selectedColor = COLORS.find(c => c.id === selected)!
   const canJoin = name.trim().length > 0
 
-const handleJoin = async ()=> {
-    if (!canJoin) return
-    router.push(`/game/${room}?name=${encodeURIComponent(name.trim())}&color=${selected}`)
-    let gameState = JSON.parse(localStorage.getItem("gameState") || "null");
+  // load state on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('gameState')
+    if (stored) setGameState(JSON.parse(stored))
+  }, [])
 
-  // if no game yet → create one
-  if (!gameState) {
-    gameState = {
-      gameId: room,
-      players: [],
-      phase: "INIT",
-      bank: {},
-      tradeState: { trades: [] },
-    };
-  }
-  
-  const res = await addPlayer(gameState, name.trim(), selected);
-  if (!res.success) {
-    alert(res.error);
-    return;
-  }
-  localStorage.setItem("gameState", JSON.stringify(res.data));
-  router.push(`/game/${room}`);
+  // optional live sync (simple polling)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const stored = localStorage.getItem('gameState')
+      if (stored) setGameState(JSON.parse(stored))
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  const handleJoin = async () => {
+    if (!canJoin) return
+
+    let current = gameState
+
+    // fallback if no state exists
+    if (!current) {
+      current = {
+        gameId: room,
+        players: [],
+        phase: "INIT",
+        bank: {},
+        tradeState: { trades: [] },
+      }
+    }
+
+    const res = await fetch("http://localhost:3000/api/init/player", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        gameState: current,
+        name: name.trim(),
+        color: selected,
+        sequence: current.players.length,
+      }),
+    })
+
+    const data = await res.json()
+
+    if (!data.success) {
+      alert(data.error)
+      return
+    }
+
+    localStorage.setItem("gameState", JSON.stringify(data.data))
+    setGameState(data.data)
+
+    if (data.data.players.length === 1) {
+      const startRes = await setPhaseToSetup1(data.data)
+      localStorage.setItem("gameState", JSON.stringify(startRes.data))
+    }
+
+    router.push(`/game/${room}`)
   }
 
   return (
@@ -160,7 +220,7 @@ const handleJoin = async ()=> {
             </p>
 
             <div className="max-w-sm">
-              <PlayerLobby name={name} colorId={selected} />
+              <PlayerLobby gameState={gameState} name={name} colorId={selected} />
             </div>
           </div>
 
@@ -207,7 +267,7 @@ const handleJoin = async ()=> {
                 Choose Your Color
               </label>
               <div className="grid grid-cols-4 gap-2">
-                {COLORS.map(c => {
+                {/* {COLORS.map(c => {
                   const taken = TAKEN_COLORS.has(c.id)
                   return (
                     <button
@@ -222,13 +282,25 @@ const handleJoin = async ()=> {
                             : 'bg-[#0E1117] border-[#2A3347] hover:border-[#3A4A5A]'
                         }`}
                     >
-                      <div className="w-4 h-4 rounded-full" style={{ background: c.dot }} />
+                      <div className="w-4 h-4 rounded-full mx-auto" style={{ background: c.dot }} />
                       <span className="f-cinzel text-[10px] font-bold tracking-widest uppercase text-[#8A9AB8]">
                         {taken ? 'Taken' : c.label}
                       </span>
                     </button>
                   )
-                })}
+                })} */}
+                {COLORS.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelected(c.id)}
+                    className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center gap-1 transition-all duration-200 
+                      ${selected === c.id ? c.border : 'border-[#1E2D42]'
+                      }`}
+                  >
+                    <div className="w-4 h-4 rounded-full mx-auto" style={{ background: c.dot }} />
+                    <div className="f-cinzel text-[10px] font-bold tracking-widest uppercase text-[#8A9AB8]">{c.label}</div>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -260,7 +332,7 @@ const handleJoin = async ()=> {
           </button>
 
           <div className="lg:hidden mt-4">
-            <PlayerLobby name={name} colorId={selected} />
+            <PlayerLobby gameState={gameState} name={name} colorId={selected} />
           </div>
 
         </div>

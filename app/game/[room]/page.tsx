@@ -2,31 +2,33 @@
 import { useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import type { GameState, Player } from '@/utils/types'
-import { buildRoad } from "@/lib/api/buildRoad";
+import { buildRoad } from "@/lib/api/build/buildRoad";
+import { buildSettlement } from "@/lib/api/build/buildSettlement";
+import { buildCity } from "@/lib/api/build/buildCity";
 
 const MY_PLAYER_ID = 'player-1'
 
 const COLOR_MAP: Record<Player['color'], string> = {
-  RED:    '#ef4444',
-  BLUE:   '#3b82f6',
-  WHITE:  '#f0e6cc',
+  RED: '#ef4444',
+  BLUE: '#3b82f6',
+  WHITE: '#f0e6cc',
   ORANGE: '#f97316',
 }
 
 const RESOURCES = [
-  { id: 'WOOD',  label: 'Wood',  color: '#4A7C4E', emoji: '🌲' },
+  { id: 'WOOD', label: 'Wood', color: '#4A7C4E', emoji: '🌲' },
   { id: 'BRICK', label: 'Brick', color: '#B85C38', emoji: '🧱' },
-  { id: 'WOOL',  label: 'Sheep', color: '#7DAF5A', emoji: '🐑' },
+  { id: 'WOOL', label: 'Sheep', color: '#7DAF5A', emoji: '🐑' },
   { id: 'WHEAT', label: 'Wheat', color: '#C8A84B', emoji: '🌾' },
-  { id: 'ORE',   label: 'Ore',   color: '#7A8FA8', emoji: '⛏️' },
+  { id: 'ORE', label: 'Ore', color: '#7A8FA8', emoji: '⛏️' },
 ] as const
 
 type ResourceId = typeof RESOURCES[number]['id']
 
 const BUILD_COSTS: Record<string, Partial<Record<ResourceId, number>>> = {
-  Road:       { WOOD: 1, BRICK: 1 },
+  Road: { WOOD: 1, BRICK: 1 },
   Settlement: { WOOD: 1, BRICK: 1, WOOL: 1, WHEAT: 1 },
-  City:       { WHEAT: 2, ORE: 3 },
+  City: { WHEAT: 2, ORE: 3 },
 }
 
 const MOCK_DICE: [number, number] = [3, 5]
@@ -167,29 +169,36 @@ export default function GamePage() {
     setTradeOpen(v => !v)
     setBuildOpen(false)
     setGameState(prev => ({
-    ...prev,
-    phase: "TRADE",
-  }))
+      ...prev,
+      phase: "TRADE",
+    }))
   }
   function toggleBuild() {
     setBuildOpen(v => !v)
     setTradeOpen(false)
     setGameState(prev => ({
-    ...prev,
-    phase: "BUILD",
-  }))
+      ...prev,
+      phase: "BUILD",
+    }))
   }
-async function handleBuild(item: string) {
-  let result;
-  if (item === "Road") {
-    result = await buildRoad(gameState);
+  async function handleBuild(item: string) {
+    let result;
+    if (item === "Road") {
+      result = await buildRoad(gameState);
+    }
+    else if (item === "Settlement") {
+      result = await buildSettlement(gameState);
+    }
+    else if (item === "City") {
+      result = await buildCity(gameState);
+    }
+    if (!result.success) {
+      alert(result.error);
+      return;
+    }
+    setGameState(result.data);
   }
-  if (!result.success) {
-    alert(result.error);
-    return;
-  }
-  setGameState(result.data);
-  }
+  
 
   function adjustOffer(map: Partial<Record<ResourceId, number>>, set: (v: Partial<Record<ResourceId, number>>) => void, id: ResourceId, delta: number, max?: number) {
     const cur = map[id] ?? 0
@@ -438,8 +447,8 @@ async function handleBuild(item: string) {
       {isMyTurn && gameState.phase === 'ROLL' ? (
         <button
           onClick={() => {
-            const d1 = Math.ceil(Math.random() * 6) as 1|2|3|4|5|6
-            const d2 = Math.ceil(Math.random() * 6) as 1|2|3|4|5|6
+            const d1 = Math.ceil(Math.random() * 6) as 1 | 2 | 3 | 4 | 5 | 6
+            const d2 = Math.ceil(Math.random() * 6) as 1 | 2 | 3 | 4 | 5 | 6
             setDice([d1, d2])
             setGameState(prev => ({ ...prev, phase: 'TRADE', dice: { sum: d1 + d2 } }))
           }}
@@ -621,8 +630,8 @@ async function handleBuild(item: string) {
             {isMyTurn
               ? <p className="f-cinzel text-sm font-bold text-[#F0C060] amber-glow">Your Turn</p>
               : <p className="f-body text-sm text-[#8A9AB8]">
-                  <span className="font-semibold" style={{ color: COLOR_MAP[currentTurnPlayer.color] }}>{currentTurnPlayer.name}</span>{`'s turn`}
-                </p>
+                <span className="font-semibold" style={{ color: COLOR_MAP[currentTurnPlayer.color] }}>{currentTurnPlayer.name}</span>{`'s turn`}
+              </p>
             }
             <p className="f-cinzel text-[10px] text-[#6B7A99] tracking-widest uppercase mt-0.5">
               {isSetupPhase
@@ -718,8 +727,8 @@ async function handleBuild(item: string) {
               {isMyTurn
                 ? <p className="f-cinzel text-xl font-bold text-[#F0C060] amber-glow">Your Turn</p>
                 : <p className="f-body text-xl text-[#8A9AB8]">
-                    <span className="font-semibold" style={{ color: COLOR_MAP[currentTurnPlayer.color] }}>{currentTurnPlayer.name}</span>{`'s turn`}
-                  </p>
+                  <span className="font-semibold" style={{ color: COLOR_MAP[currentTurnPlayer.color] }}>{currentTurnPlayer.name}</span>{`'s turn`}
+                </p>
               }
               <p className="f-cinzel text-xs text-[#6B7A99] tracking-widest uppercase mt-1">
                 {isSetupPhase

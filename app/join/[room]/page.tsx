@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from 'next/navigation'
-import { setPhaseToSetup1 } from "@/lib/api/game/start_game"
+import { getGame } from '@/lib/api/game/getGame'
+import { addPlayer } from '@/lib/api/game/addPlayer'
+import { startGame } from '@/lib/api/game/startGame'
 
 const COLORS = [
   { id: 'RED', label: 'Red', dot: '#ef4444', bg: 'bg-red-500/20', border: 'border-red-500/60' },
@@ -88,86 +90,59 @@ function PlayerLobby({ gameState, name, colorId }: any) {
 export default function JoinRoomPage() {
   const router = useRouter()
   const params = useParams()
-  const room = (params.room as string).toUpperCase()
+  const { room } = useParams()
 
-  const [selected, setSelected] = useState<ColorId>('RED')
+  const [color, setColor] = useState<ColorId>('RED')
   const [name, setName] = useState('')
   const [gameState, setGameState] = useState<any>(null)
+  const [players, setPlayers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const selectedColor = COLORS.find(c => c.id === selected)!
+  const selectedColor = COLORS.find(c => c.id === color)!
   const canJoin = name.trim().length > 0
 
   useEffect(() => {
-    const init = async () => {
-      const res = await fetch('http://localhost:3000/api/init/gamestate')
-      const data = await res.json()
+    async function load() {
+      const data = await getGame(room as string)
+
       if (data.success) {
-        localStorage.setItem('gameState', JSON.stringify(data.data))
         setGameState(data.data)
       }
     }
-    init()
-  }, [])
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const stored = localStorage.getItem('gameState')
-      if (stored) setGameState(JSON.parse(stored))
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [])
+    load()
+  }, [room])
 
   const handleJoin = async () => {
-    if (!canJoin) return
-
-    let current = gameState
-
-    // fallback if no state exists
-    if (!current) {
-      current = {
-        gameId: room,
-        players: [],
-        phase: "INIT",
-        bank: {},
-        tradeState: { trades: [] },
-      }
-    }
-
-    const res = await fetch("http://localhost:3000/api/init/player", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        gameState: current,
-        name: name.trim(),
-        color: selected,
-        sequence: current.players.length,
-      }),
+    const data = await addPlayer({
+      gameState,
+      name,
+      color,
+      sequence: gameState.players.length + 1,
     })
 
-    const data = await res.json()
-
-    if (!data.success) {
-      alert(data.error)
-      return
+    if (data.success) {
+      setGameState(data.data)
     }
+    console.log("Loaded:", data.data)
+  }
 
-    localStorage.setItem("gameState", JSON.stringify(data.data))
-    setGameState(data.data)
+  const handleStart = async () => {
+    const data = await startGame(gameState)
 
-    const myPlayer = data.data.players.find(
-      (p: any) => p.name === name.trim() && p.color === selected
-    )
-    if (myPlayer) {
-      localStorage.setItem("myPlayerId", myPlayer.playerId)
-    }
-
-    if (data.data.players.length === 1) {
-      const startRes = await setPhaseToSetup1(data.data)
-      localStorage.setItem("gameState", JSON.stringify(startRes.data))
+    if (data.success) {
+      setGameState(data.data)
     }
 
     router.push(`/game/${room}`)
+  }
+
+  if (!gameState) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+        Loading...
+      </div>
+    )
   }
 
   return (
@@ -232,7 +207,7 @@ export default function JoinRoomPage() {
             </p>
 
             <div className="max-w-sm">
-              <PlayerLobby gameState={gameState} name={name} colorId={selected} />
+              <PlayerLobby gameState={gameState} name={name} colorId={color} />
             </div>
           </div>
 
@@ -304,9 +279,9 @@ export default function JoinRoomPage() {
                 {COLORS.map(c => (
                   <button
                     key={c.id}
-                    onClick={() => setSelected(c.id)}
+                    onClick={() => setColor(c.id)}
                     className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center gap-1 transition-all duration-200 
-                      ${selected === c.id ? c.border : 'border-[#1E2D42]'
+                      ${color === c.id ? c.border : 'border-[#1E2D42]'
                       }`}
                   >
                     <div className="w-4 h-4 rounded-full mx-auto" style={{ background: c.dot }} />
@@ -344,9 +319,14 @@ export default function JoinRoomPage() {
           </button>
 
           <div className="lg:hidden mt-4">
-            <PlayerLobby gameState={gameState} name={name} colorId={selected} />
+            <PlayerLobby gameState={gameState} name={name} colorId={color} />
           </div>
-
+          <button
+            onClick={handleStart}
+            className="w-full bg-green-500 p-4 rounded font-bold mt-10"
+          >
+            Start Game
+          </button>
         </div>
       </div>
     </div>

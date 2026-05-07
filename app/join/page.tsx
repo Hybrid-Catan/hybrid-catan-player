@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { QrCode } from 'lucide-react'
+import { createGame } from '@/lib/api/game/createGame'
 
 export default function EnterCodePage() {
   const router = useRouter()
@@ -10,9 +11,23 @@ export default function EnterCodePage() {
 
   const canEnter = code.trim().length > 0
 
-  const handleEnter = () => {
+  const handleEnter = async () => {
     if (!canEnter) return
-    router.push(`/join/${code.trim().toUpperCase()}`)
+    const roomCode = code.trim().toUpperCase()
+    try {
+      const result = await createGame(roomCode)
+
+      if (!result.success) {
+        alert(result.error)
+        return
+      }
+      console.log("Created Game:", result.data)
+
+      router.push(`/join/${roomCode}`)
+    } catch (error) {
+      console.error(error)
+      alert("Failed to create game")
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

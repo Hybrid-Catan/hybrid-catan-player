@@ -1,12 +1,10 @@
 'use client'
-import { useState } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import type { GameState, Player } from '@/utils/types'
 import { buildRoad } from "@/lib/api/build/buildRoad";
 import { buildSettlement } from "@/lib/api/build/buildSettlement";
 import { buildCity } from "@/lib/api/build/buildCity";
-
-const MY_PLAYER_ID = 'player-1'
 
 const COLOR_MAP: Record<Player['color'], string> = {
   RED: '#ef4444',
@@ -40,7 +38,7 @@ const MOCK_GAME_STATE: GameState = {
   dice: { sum: MOCK_DICE[0] + MOCK_DICE[1] },
   players: [
     {
-      playerId: MY_PLAYER_ID,
+      playerId: 'player-1',
       name: 'Alex',
       color: 'RED',
       victoryPoints: 0,
@@ -127,26 +125,39 @@ function Die({ value }: { value: number }) {
 
 export default function GamePage() {
   const params = useParams()
-  const searchParams = useSearchParams()
   const room = (params.room as string).toUpperCase()
 
   const [gameState, setGameState] = useState<GameState>(MOCK_GAME_STATE)
   const [dice, setDice] = useState<[number, number]>(MOCK_DICE)
-
-  const currentTurnPlayer = gameState.players[0]
-  const isMyTurn = currentTurnPlayer.playerId === MY_PLAYER_ID
-  const myPlayer = gameState.players.find(p => p.playerId === MY_PLAYER_ID)!
-  const otherPlayers = gameState.players.filter(p => p.playerId !== MY_PLAYER_ID)
-
+  const [myPlayerId, setMyPlayerId] = useState<string>('player-1')
   const [resources, setResources] = useState<Record<ResourceId, number>>(
-    myPlayer.resourceCards as Record<ResourceId, number>
+    { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 }
   )
 
-  const VALID_COLORS = new Set<Player['color']>(['RED', 'BLUE', 'WHITE', 'ORANGE'])
-  const colorParam = searchParams.get('color') as Player['color']
+  useEffect(() => {
+    const storedState = localStorage.getItem('gameState')
+    const storedPlayerId = localStorage.getItem('myPlayerId')
+    if (storedState) {
+      const gs = JSON.parse(storedState) as GameState
+      setGameState(gs)
+      if (storedPlayerId) {
+        setMyPlayerId(storedPlayerId)
+        const player = gs.players.find(p => p.playerId === storedPlayerId)
+        if (player) {
+          setResources(player.resourceCards as Record<ResourceId, number>)
+        }
+      }
+    }
+  }, [])
+
+  const currentTurnPlayer = gameState.players[0]
+  const isMyTurn = currentTurnPlayer.playerId === myPlayerId
+  const myPlayer = gameState.players.find(p => p.playerId === myPlayerId) ?? gameState.players[0]
+  const otherPlayers = gameState.players.filter(p => p.playerId !== myPlayerId)
+
   const me = {
-    name: searchParams.get('name') ?? myPlayer.name,
-    color: VALID_COLORS.has(colorParam) ? colorParam : myPlayer.color,
+    name: myPlayer.name,
+    color: myPlayer.color,
     victoryPoints: myPlayer.victoryPoints,
     resources,
   }
@@ -513,7 +524,7 @@ export default function GamePage() {
     <div className="space-y-2">
       {gameState.players.map(p => {
         const isCurrentTurnPlayer = p.playerId === currentTurnPlayer.playerId
-        const isMe = p.playerId === MY_PLAYER_ID
+        const isMe = p.playerId === myPlayerId
         return (
           <div key={p.playerId}
             className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 bg-[#0A0D14]"
@@ -574,7 +585,7 @@ export default function GamePage() {
                   players: prev.players.map(p => ({
                     ...p,
                     victoryPoints: 2,
-                    resources: p.playerId === MY_PLAYER_ID ? myNewResources : randomResources(),
+                    resources: p.playerId === myPlayerId ? myNewResources : randomResources(),
                     pieces: { settlementsPlaced: 2, citiesPlaced: 0, roadsPlaced: 2 },
                   })),
                 }))

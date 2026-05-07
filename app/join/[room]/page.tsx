@@ -97,13 +97,18 @@ export default function JoinRoomPage() {
   const selectedColor = COLORS.find(c => c.id === selected)!
   const canJoin = name.trim().length > 0
 
-  // load state on mount
   useEffect(() => {
-    const stored = localStorage.getItem('gameState')
-    if (stored) setGameState(JSON.parse(stored))
+    const init = async () => {
+      const res = await fetch('http://localhost:3000/api/init/gamestate')
+      const data = await res.json()
+      if (data.success) {
+        localStorage.setItem('gameState', JSON.stringify(data.data))
+        setGameState(data.data)
+      }
+    }
+    init()
   }, [])
 
-  // optional live sync (simple polling)
   useEffect(() => {
     const interval = setInterval(() => {
       const stored = localStorage.getItem('gameState')
@@ -149,6 +154,13 @@ export default function JoinRoomPage() {
 
     localStorage.setItem("gameState", JSON.stringify(data.data))
     setGameState(data.data)
+
+    const myPlayer = data.data.players.find(
+      (p: any) => p.name === name.trim() && p.color === selected
+    )
+    if (myPlayer) {
+      localStorage.setItem("myPlayerId", myPlayer.playerId)
+    }
 
     if (data.data.players.length === 1) {
       const startRes = await setPhaseToSetup1(data.data)

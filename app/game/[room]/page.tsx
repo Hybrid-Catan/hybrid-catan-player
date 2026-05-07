@@ -1,10 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import type { GameState, Player } from '@/utils/types'
 import { buildRoad } from "@/lib/api/build/buildRoad";
 import { buildSettlement } from "@/lib/api/build/buildSettlement";
 import { buildCity } from "@/lib/api/build/buildCity";
+import { getGame } from "@/lib/api/game/getGame";
 
 const COLOR_MAP: Record<Player['color'], string> = {
   RED: '#ef4444',
@@ -29,71 +30,6 @@ const BUILD_COSTS: Record<string, Partial<Record<ResourceId, number>>> = {
   City: { WHEAT: 2, ORE: 3 },
 }
 
-const MOCK_DICE: [number, number] = [3, 5]
-
-const MOCK_GAME_STATE: GameState = {
-  gameId: 'mock-game-1',
-  status: 'IN_PROGRESS',
-  phase: 'SETUP_1',
-  dice: { sum: MOCK_DICE[0] + MOCK_DICE[1] },
-  players: [
-    {
-      playerId: 'player-1',
-      name: 'Alex',
-      color: 'RED',
-      victoryPoints: 0,
-      resourceCards: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
-      developmentCards: { KNIGHT: 0, MONOPOLY: 0, ROAD_BUILDING: 0, INVENTION: 0, VICTORY_POINT: 0 },
-      pieces: { settlementsPlaced: 0, citiesPlaced: 0, roadsPlaced: 0 },
-      achievements: { hasLongestRoad: false, longestRoadLength: 0, hasLargestArmy: false, armySize: 0 },
-      portsOwned: [],
-      turnState: { currentPhase: 'SETUP' },
-    },
-    {
-      playerId: 'player-2',
-      name: 'Jordan',
-      color: 'BLUE',
-      victoryPoints: 0,
-      resourceCards: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
-      developmentCards: { KNIGHT: 0, MONOPOLY: 0, ROAD_BUILDING: 0, INVENTION: 0, VICTORY_POINT: 0 },
-      pieces: { settlementsPlaced: 0, citiesPlaced: 0, roadsPlaced: 0 },
-      achievements: { hasLongestRoad: false, longestRoadLength: 0, hasLargestArmy: false, armySize: 0 },
-      portsOwned: [],
-      turnState: { currentPhase: 'SETUP' },
-    },
-    {
-      playerId: 'player-3',
-      name: 'Sam',
-      color: 'WHITE',
-      victoryPoints: 0,
-      resourceCards: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
-      developmentCards: { KNIGHT: 0, MONOPOLY: 0, ROAD_BUILDING: 0, INVENTION: 0, VICTORY_POINT: 0 },
-      pieces: { settlementsPlaced: 0, citiesPlaced: 0, roadsPlaced: 0 },
-      achievements: { hasLongestRoad: false, longestRoadLength: 0, hasLargestArmy: false, armySize: 0 },
-      portsOwned: [],
-      turnState: { currentPhase: 'SETUP' },
-    },
-    {
-      playerId: 'player-4',
-      name: 'Mia',
-      color: 'ORANGE',
-      victoryPoints: 0,
-      resourceCards: { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 },
-      developmentCards: { KNIGHT: 0, MONOPOLY: 0, ROAD_BUILDING: 0, INVENTION: 0, VICTORY_POINT: 0 },
-      pieces: { settlementsPlaced: 0, citiesPlaced: 0, roadsPlaced: 0 },
-      achievements: { hasLongestRoad: false, longestRoadLength: 0, hasLargestArmy: false, armySize: 0 },
-      portsOwned: [],
-      turnState: { currentPhase: 'SETUP' },
-    },
-  ],
-  bank: {
-    resources: { WOOD: 19, BRICK: 19, WOOL: 19, WHEAT: 19, ORE: 19 },
-    developmentCardsRemaining: 25,
-  },
-  developmentDeck: { KNIGHT: 14, MONOPOLY: 2, ROAD_BUILDING: 2, INVENTION: 2, VICTORY_POINT: 5 },
-  tradeState: { Trades: [] },
-  winner: { playerId: '' },
-}
 
 function canAfford(resources: Record<ResourceId, number>, cost: Partial<Record<ResourceId, number>>) {
   return Object.entries(cost).every(([r, n]) => resources[r as ResourceId] >= (n ?? 0))
@@ -126,29 +62,44 @@ function Die({ value }: { value: number }) {
 export default function GamePage() {
   const params = useParams()
   const room = (params.room as string).toUpperCase()
+  const searchParams = useSearchParams()
+  const myPlayerId = searchParams.get('playerId') ?? ''
 
-  const [gameState, setGameState] = useState<GameState>(MOCK_GAME_STATE)
-  const [dice, setDice] = useState<[number, number]>(MOCK_DICE)
-  const [myPlayerId, setMyPlayerId] = useState<string>('player-1')
+  const [gameState, setGameState] = useState<GameState | null>(null)
+  const [dice, setDice] = useState<[number, number]>([1, 1])
   const [resources, setResources] = useState<Record<ResourceId, number>>(
     { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 }
   )
+  const [setupStep, setSetupStep] = useState<'settlement' | 'road'>('settlement')
+  const [buildOpen, setBuildOpen] = useState(false)
+  const [tradeOpen, setTradeOpen] = useState(false)
+  const [tradeMode, setTradeMode] = useState<'bank' | 'player'>('bank')
+  const [bankGive, setBankGive] = useState<ResourceId | null>(null)
+  const [bankGet, setBankGet] = useState<ResourceId | null>(null)
+  const [offerGive, setOfferGive] = useState<Partial<Record<ResourceId, number>>>({})
+  const [offerRequest, setOfferRequest] = useState<Partial<Record<ResourceId, number>>>({})
+  const [targetPlayer, setTargetPlayer] = useState<string | null>(null)
+  const [sentOffer, setSentOffer] = useState<string | null>(null)
 
   useEffect(() => {
-    const storedState = localStorage.getItem('gameState')
-    const storedPlayerId = localStorage.getItem('myPlayerId')
-    if (storedState) {
-      const gs = JSON.parse(storedState) as GameState
-      setGameState(gs)
-      if (storedPlayerId) {
-        setMyPlayerId(storedPlayerId)
-        const player = gs.players.find(p => p.playerId === storedPlayerId)
-        if (player) {
-          setResources(player.resourceCards as Record<ResourceId, number>)
-        }
+    async function load() {
+      const data = await getGame(room)
+      if (data.success) {
+        setGameState(data.data)
+        const player = data.data.players.find((p: any) => p.playerId === myPlayerId)
+        if (player) setResources(player.resourceCards as Record<ResourceId, number>)
       }
     }
-  }, [])
+    load()
+  }, [room])
+
+  if (!gameState) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0E1117] text-white">
+        Loading...
+      </div>
+    )
+  }
 
   const currentTurnPlayer = gameState.players[0]
   const isMyTurn = currentTurnPlayer.playerId === myPlayerId
@@ -164,17 +115,6 @@ export default function GamePage() {
 
   const isSetupPhase = gameState.phase === 'SETUP_1' || gameState.phase === 'SETUP_2'
   const setupPhaseNum = gameState.phase === 'SETUP_2' ? 2 : 1
-  const [setupStep, setSetupStep] = useState<'settlement' | 'road'>('settlement')
-
-  const [buildOpen, setBuildOpen] = useState(false)
-  const [tradeOpen, setTradeOpen] = useState(false)
-  const [tradeMode, setTradeMode] = useState<'bank' | 'player'>('bank')
-  const [bankGive, setBankGive] = useState<ResourceId | null>(null)
-  const [bankGet, setBankGet] = useState<ResourceId | null>(null)
-  const [offerGive, setOfferGive] = useState<Partial<Record<ResourceId, number>>>({})
-  const [offerRequest, setOfferRequest] = useState<Partial<Record<ResourceId, number>>>({})
-  const [targetPlayer, setTargetPlayer] = useState<string | null>(null)
-  const [sentOffer, setSentOffer] = useState<string | null>(null)
 
   function toggleTrade() {
     setTradeOpen(v => !v)

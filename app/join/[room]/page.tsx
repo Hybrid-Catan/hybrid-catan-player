@@ -89,17 +89,16 @@ function PlayerLobby({ gameState, name, colorId }: any) {
 
 export default function JoinRoomPage() {
   const router = useRouter()
-  const params = useParams()
   const { room } = useParams()
 
   const [color, setColor] = useState<ColorId>('RED')
   const [name, setName] = useState('')
   const [gameState, setGameState] = useState<any>(null)
-  const [players, setPlayers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [myPlayerId, setMyPlayerId] = useState<string | null>(null)
 
+  const takenColors = new Set(gameState?.players?.map((p: any) => p.color) ?? [])
   const selectedColor = COLORS.find(c => c.id === color)!
-  const canJoin = name.trim().length > 0
+  const canJoin = name.trim().length > 0 && !takenColors.has(color)
 
   useEffect(() => {
     async function load() {
@@ -123,18 +122,17 @@ export default function JoinRoomPage() {
 
     if (data.success) {
       setGameState(data.data)
+      const myPlayer = data.data.players.find((p: any) => p.name === name && p.color === color)
+      if (myPlayer) setMyPlayerId(myPlayer.playerId)
     }
-    console.log("Loaded:", data.data)
   }
 
   const handleStart = async () => {
     const data = await startGame(gameState)
 
     if (data.success) {
-      setGameState(data.data)
+      router.push(`/game/${room}?playerId=${myPlayerId}`)
     }
-
-    router.push(`/game/${room}`)
   }
 
   if (!gameState) {
@@ -254,17 +252,17 @@ export default function JoinRoomPage() {
                 Choose Your Color
               </label>
               <div className="grid grid-cols-4 gap-2">
-                {/* {COLORS.map(c => {
-                  const taken = TAKEN_COLORS.has(c.id)
+                {COLORS.map(c => {
+                  const taken = takenColors.has(c.id)
                   return (
                     <button
                       key={c.id}
-                      onClick={() => !taken && setSelected(c.id)}
+                      onClick={() => !taken && setColor(c.id)}
                       disabled={taken}
                       className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center gap-1 transition-all duration-200
                         ${taken
                           ? 'bg-[#0E1117] border-[#2A3347] opacity-30 cursor-not-allowed'
-                          : selected === c.id
+                          : color === c.id
                             ? `${c.bg} ${c.border}`
                             : 'bg-[#0E1117] border-[#2A3347] hover:border-[#3A4A5A]'
                         }`}
@@ -275,19 +273,7 @@ export default function JoinRoomPage() {
                       </span>
                     </button>
                   )
-                })} */}
-                {COLORS.map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => setColor(c.id)}
-                    className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center gap-1 transition-all duration-200 
-                      ${color === c.id ? c.border : 'border-[#1E2D42]'
-                      }`}
-                  >
-                    <div className="w-4 h-4 rounded-full mx-auto" style={{ background: c.dot }} />
-                    <div className="f-cinzel text-[10px] font-bold tracking-widest uppercase text-[#8A9AB8]">{c.label}</div>
-                  </button>
-                ))}
+                })}
               </div>
             </div>
 

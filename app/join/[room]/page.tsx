@@ -15,16 +15,6 @@ const COLORS = [
 
 type ColorId = typeof COLORS[number]['id']
 
-// const MOCK_PLAYERS = [
-//   { name: 'Jordan', color: 'BLUE' as ColorId,   ready: true  },
-//   { name: 'Sam',    color: 'WHITE' as ColorId,   ready: true  },
-//   { name: 'Mia',    color: 'ORANGE' as ColorId,  ready: false },
-// ]
-
-// const TAKEN_COLORS = new Set(MOCK_PLAYERS.map(p => p.color))
-
-// const DEFAULT_COLOR = (COLORS.find(c => !TAKEN_COLORS.has(c.id)) ?? COLORS[0]).id
-
 function PlayerLobby({ gameState, name, colorId }: any) {
   const dotColor = COLORS.find(c => c.id === colorId)?.dot || '#fff'
   return (

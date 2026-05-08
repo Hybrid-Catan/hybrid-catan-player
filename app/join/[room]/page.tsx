@@ -35,24 +35,6 @@ function PlayerLobby({ gameState, name, colorId }: any) {
       </div>
       <div className="divide-y divide-[#1A2235]">
 
-        {/* YOU */}
-        {name?.trim()?.length > 0 && (
-          <div className="flex items-center gap-3 px-5 py-3">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white"
-              style={{ background: dotColor }}
-            >
-              {name[0].toUpperCase()}
-            </div>
-            <span className="f-body text-sm text-[#F0E6CC] font-semibold flex-1">
-              {name} (You)
-            </span>
-            <span className="f-cinzel text-[10px] text-emerald-400">
-              Ready
-            </span>
-          </div>
-        )}
-
         {/* REAL PLAYERS */}
         {gameState?.players?.map((p: any) => {
           const color = COLORS.find(c => c.id === p.color)?.dot || '#fff'
@@ -78,10 +60,14 @@ function PlayerLobby({ gameState, name, colorId }: any) {
         })}
 
         {/* EMPTY SLOT */}
-        <div className="flex items-center gap-3 px-5 py-3">
-          <div className="w-8 h-8 rounded-full border border-dashed border-[#2A3347]" />
-          <span className="f-body text-sm text-[#4A5875]">Open slot</span>
-        </div>
+        {Array.from({
+          length: Math.max(0, 4 - gameState.players.length)
+        }).map((_, i) => (
+          <div key={`empty-${i}`} className="flex items-center gap-3 px-5 py-3">
+            <div className="w-8 h-8 rounded-full border border-dashed border-[#2A3347]" />
+            <span className="f-body text-sm text-[#4A5875]">Open slot</span>
+          </div>
+        ))}
       </div>
     </div>
   )

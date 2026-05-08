@@ -30,7 +30,6 @@ const BUILD_COSTS: Record<string, Partial<Record<ResourceId, number>>> = {
   City: { WHEAT: 2, ORE: 3 },
 }
 
-
 function canAfford(resources: Record<ResourceId, number>, cost: Partial<Record<ResourceId, number>>) {
   return Object.entries(cost).every(([r, n]) => resources[r as ResourceId] >= (n ?? 0))
 }
@@ -119,18 +118,24 @@ export default function GamePage() {
   function toggleTrade() {
     setTradeOpen(v => !v)
     setBuildOpen(false)
-    setGameState(prev => ({
-      ...prev,
-      phase: "TRADE",
-    }))
+    setGameState(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        phase: "TRADE",
+      }
+    })
   }
   function toggleBuild() {
     setBuildOpen(v => !v)
     setTradeOpen(false)
-    setGameState(prev => ({
-      ...prev,
-      phase: "BUILD",
-    }))
+    setGameState(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        phase: "BUILD",
+      }
+    })
   }
   async function handleBuild(item: string) {
     let result;
@@ -149,7 +154,7 @@ export default function GamePage() {
     }
     setGameState(result.data);
   }
-  
+
 
   function adjustOffer(map: Partial<Record<ResourceId, number>>, set: (v: Partial<Record<ResourceId, number>>) => void, id: ResourceId, delta: number, max?: number) {
     const cur = map[id] ?? 0
@@ -401,7 +406,14 @@ export default function GamePage() {
             const d1 = Math.ceil(Math.random() * 6) as 1 | 2 | 3 | 4 | 5 | 6
             const d2 = Math.ceil(Math.random() * 6) as 1 | 2 | 3 | 4 | 5 | 6
             setDice([d1, d2])
-            setGameState(prev => ({ ...prev, phase: 'TRADE', dice: { sum: d1 + d2 } }))
+            setGameState(prev => {
+              if (!prev) return prev
+              return {
+                ...prev,
+                phase: "TRADE",
+                dice: { sum: d1 + d2 }
+              }
+            })
           }}
           className="flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase
           bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#0E1117]
@@ -515,20 +527,36 @@ export default function GamePage() {
                 return res
               }
               if (gameState.phase === 'SETUP_1') {
-                setGameState(prev => ({ ...prev, phase: 'SETUP_2' }))
+                setGameState(prev => {
+                  if (!prev) return prev
+                  return {
+                    ...prev,
+                    phase: "SETUP_2",
+                  }
+                })
               } else {
                 const myNewResources = randomResources()
                 setResources(myNewResources)
-                setGameState(prev => ({
-                  ...prev,
-                  phase: 'ROLL',
-                  players: prev.players.map(p => ({
-                    ...p,
-                    victoryPoints: 2,
-                    resources: p.playerId === myPlayerId ? myNewResources : randomResources(),
-                    pieces: { settlementsPlaced: 2, citiesPlaced: 0, roadsPlaced: 2 },
-                  })),
-                }))
+                setGameState(prev => {
+                  if (!prev) return prev
+                  return {
+                    ...prev,
+                    phase: 'ROLL',
+                    players: prev.players.map(p => ({
+                      ...p,
+                      victoryPoints: 2,
+                      resourceCards:
+                        p.playerId === myPlayerId
+                          ? myNewResources
+                          : randomResources(),
+                      pieces: {
+                        settlementsPlaced: 2,
+                        citiesPlaced: 0,
+                        roadsPlaced: 2,
+                      },
+                    })),
+                  }
+                })
               }
             }}
             className="flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase

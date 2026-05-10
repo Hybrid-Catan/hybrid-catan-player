@@ -1,7 +1,5 @@
 "use client";
-<<<<<<< Updated upstream
 import { useEffect, useRef } from "react";
-=======
 import { useEffect, useRef, useState } from "react";
 
 const MiniHex = ({ x, y, size, fill }: { x: number; y: number; size: number; fill: string }) => {
@@ -14,12 +12,8 @@ const MiniHex = ({ x, y, size, fill }: { x: number; y: number; size: number; fil
 
 interface LogEntry { ts: string; msg: string; type: "info" | "success" | "warn" | "error"; }
 const LOG_COLORS: Record<LogEntry["type"], string> = {
-    info: "text-[#6B7A99]",
-    success: "text-emerald-400",
-    warn: "text-yellow-400",
-    error: "text-red-400",
+    info: "text-[#6B7A99]", success: "text-emerald-400", warn: "text-yellow-400", error: "text-red-400",
 };
-
 function now() {
     return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
@@ -31,32 +25,24 @@ const ICE_SERVERS = [
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun2.l.google.com:19302" },
 ];
->>>>>>> Stashed changes
+
 
 export default function Player() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
-<<<<<<< Updated upstream
-=======
     const socketRef = useRef<WebSocket | null>(null);
     const iceCandidateBuffer = useRef<RTCIceCandidateInit[]>([]);
     const remoteDescSet = useRef(false);
+    // Store the normalised gameId so we can rejoin without re-rendering the join form
     const gameIdRef = useRef<string | null>(null);
     const playerIndexRef = useRef<number>(0);
->>>>>>> Stashed changes
 
-    useEffect(() => {
-        const socket = new WebSocket(process.env.NEXT_PUBLIC_HOST_WS!);
 
-<<<<<<< Updated upstream
-        const pc = new RTCPeerConnection({
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-        });
-        pcRef.current = pc;
+    const [logs, setLogs] = useState<LogEntry[]>([]);
+    const [inputCode, setInputCode] = useState("");
+    const [hasJoined, setHasJoined] = useState(false);
+    const [connStatus, setConnStatus] = useState<ConnStatus>("idle");
 
-        pc.ontrack = (event) => {
-            if (videoRef.current) videoRef.current.srcObject = event.streams[0];
-=======
     function addLog(msg: string, type: LogEntry["type"] = "info") {
         setLogs(prev => [{ ts: now(), msg, type }, ...prev].slice(0, 30));
     }
@@ -67,15 +53,17 @@ export default function Player() {
     }
 
     function handleJoin() {
-        if (inputCode.trim().length < 4) return;
+        const code = inputCode.trim();
+        if (code.length < 4) return;
         setHasJoined(true);
     }
 
-    // ── Core session setup ───────────────────────────────────────────────────────
+    // ── Core session setup — extracted so we can call it for rejoins too ──
     function startSession(gid: string, pidx: number) {
         iceCandidateBuffer.current = [];
         remoteDescSet.current = false;
 
+        // Tear down any existing PC/socket before creating new ones
         pcRef.current?.close();
         socketRef.current?.close();
 
@@ -84,48 +72,36 @@ export default function Player() {
         socketRef.current = socket;
 
         const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+        const pc = new RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
         pcRef.current = pc;
-
         addLog(`Joining room: ${gid} (player ${pidx})`, "info");
 
-        // ── ontrack: host sends the CV canvas stream — attach directly to <video> ──
         pc.ontrack = event => {
-            addLog("Media track received from host.", "info");
-            if (videoRef.current) {
-                // The host streams captureStream() output from their CV canvas.
-                // Attaching to srcObject here means the player sees exactly what
-                // the Python CV pipeline drew — tile labels, numbers, ports, etc.
-                videoRef.current.srcObject = event.streams[0];
-                videoRef.current.play().catch(err => {
-                    addLog(`Video play error: ${err.message}`, "warn");
-                });
-            }
+            if (videoRef.current) videoRef.current.srcObject = event.streams[0];
             setConnStatus("connected");
-            addLog("Board stream synchronised. CV output is live.", "success");
->>>>>>> Stashed changes
+            addLog("Stream synchronised. Board is live.", "success");
+
         };
 
-        pc.onicecandidate = (event) => {
+        pc.onicecandidate = event => {
             if (event.candidate && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ type: "ice", candidate: event.candidate }));
+                socket.send(JSON.stringify({ type: "ice", candidate: event.candidate, gameId: gid }));
             }
         };
 
-<<<<<<< Updated upstream
-        socket.onmessage = async (event) => {
-            const data = JSON.parse(event.data);
-=======
         pc.oniceconnectionstatechange = () => {
             const state = pc.iceConnectionState;
-            addLog(`ICE → ${state}`,
-                state === "connected" || state === "completed" ? "success"
-                    : state === "failed" ? "error" : "info");
+            addLog(`ICE → ${state}`, state === "connected" || state === "completed" ? "success" : state === "failed" ? "error" : "info");
             if (state === "failed") {
                 addLog("ICE failed — attempting restart…", "warn");
                 pc.restartIce();
             }
         };
 
+        socket.onmessage = async (event) => {
+            const data = JSON.parse(event.data);
         socket.onopen = () => {
             setConnStatus("searching");
             addLog("Signaling socket opened.", "success");
@@ -136,46 +112,94 @@ export default function Player() {
         socket.onmessage = async event => {
             const data = JSON.parse(event.data as string);
 
-            // ── Host disconnected ────────────────────────────────────────────────────
+            // ── Host disconnected ──────────────────────────────────────────
             if (data.type === "host_disconnected") {
                 addLog("Host has disconnected. Waiting for them to rejoin…", "warn");
                 setConnStatus("host_gone");
+                // Clear the video stream
                 if (videoRef.current) videoRef.current.srcObject = null;
+                // Close PC — we'll rebuild it when the host comes back
                 pc.close();
                 return;
             }
 
-            // ── Host reconnected — rebuild WebRTC ───────────────────────────────────
+            // ── Host reconnected — rebuild WebRTC from scratch ─────────────
             if (data.type === "host_reconnected") {
                 addLog("Host is back! Re-establishing connection…", "success");
                 setConnStatus("searching");
+                // Start a fresh session on the same socket
                 startSession(gid, pidx);
                 return;
             }
 
             if (data.gameId !== gid) return;
->>>>>>> Stashed changes
+
 
             if (data.type === "offer") {
-                await pc.setRemoteDescription(data.offer);
+                setConnStatus("handshaking");
+                addLog("SDP offer received — completing handshake…", "info");
+
+                await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+                remoteDescSet.current = true;
+
+                if (iceCandidateBuffer.current.length > 0) {
+                    addLog(`Flushing ${iceCandidateBuffer.current.length} buffered ICE candidate(s)…`, "info");
+                    for (const candidate of iceCandidateBuffer.current) {
+                        await pc.addIceCandidate(new RTCIceCandidate(candidate))
+                            .catch(e => console.warn("Buffered ICE error", e));
+                    }
+                    iceCandidateBuffer.current = [];
+                }
+
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
-<<<<<<< Updated upstream
-                socket.send(JSON.stringify({ type: "answer", answer }));
-=======
-                socket.send(JSON.stringify({ type: "answer", answer, gameId: gid, playerIndex: pidx }));
+
+                socket.send(JSON.stringify({
+                    type: "answer",
+                    answer,
+                    gameId: gid,
+                    playerIndex: pidx,
+                }));
                 addLog("SDP answer sent.", "success");
->>>>>>> Stashed changes
+                socket.send(JSON.stringify({ type: "answer", answer }));
+
 
             } else if (data.type === "ice") {
-                await pc.addIceCandidate(data.candidate);
+                if (!data.candidate) return;
+                if (!remoteDescSet.current) {
+                    iceCandidateBuffer.current.push(data.candidate);
+                    addLog("ICE candidate buffered (awaiting remote desc).", "info");
+                } else {
+                    await pc.addIceCandidate(new RTCIceCandidate(data.candidate))
+                        .catch(e => console.warn("ICE candidate error", e));
+                }
             }
         };
 
-<<<<<<< Updated upstream
+        socket.onerror = () => {
+            addLog("WebSocket connection error.", "error");
+            setConnStatus("error");
+        };
+
+        socket.onclose = () => {
+            addLog("Signaling socket closed.", "warn");
+        };
+    }
+
+    // ── Kick off the session once hasJoined flips ────────────────────────
+    useEffect(() => {
+        if (!hasJoined) return;
+
+        const gid = normaliseGameId(inputCode);
+        gameIdRef.current = gid;
+        // For simplicity use a fixed player index; in a real app this would be assigned by the server
+        const pidx = Math.floor(Math.random() * 3) + 1; // 1–3 (0 = host/red)
+        playerIndexRef.current = pidx;
+
+        startSession(gid, pidx);
         socket.onerror = (err) => console.error("Player WS error:", err);
 
-=======
+
         socket.onerror = () => {
             addLog("WebSocket connection error.", "error");
             setConnStatus("error");
@@ -194,16 +218,13 @@ export default function Player() {
         const pidx = Math.floor(Math.random() * 3) + 1; // 1–3 (0 = host/red)
         playerIndexRef.current = pidx;
         startSession(gid, pidx);
->>>>>>> Stashed changes
         return () => {
-            socket.close();
-            pc.close();
+            pcRef.current?.close();
+            socketRef.current?.close();
         };
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hasJoined]);
 
-<<<<<<< Updated upstream
-    return <video ref={videoRef} autoPlay playsInline style={{ width: "100%" }} />;
-=======
     function leave() {
         pcRef.current?.close();
         socketRef.current?.close();
@@ -219,6 +240,7 @@ export default function Player() {
         if (videoRef.current) videoRef.current.srcObject = null;
     }
 
+    // ── Manual "Try Again" when host is gone ─────────────────────────────
     function retryConnection() {
         const gid = gameIdRef.current;
         if (!gid) return;
@@ -243,16 +265,16 @@ export default function Player() {
         .f-title  { font-family:'Cinzel Decorative',serif; }
         .f-cinzel { font-family:'Cinzel',serif; }
         .f-body   { font-family:'Crimson Pro',serif; }
-        @keyframes fadeIn    { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
         @keyframes pulseRing { 0%,100%{transform:scale(1);opacity:.6} 50%{transform:scale(1.15);opacity:1} }
-        .log-entry  { animation:fadeIn .2s ease both; }
+        .log-entry { animation:fadeIn .2s ease both; }
         .pulse-ring { animation:pulseRing 2s ease-in-out infinite; }
       `}</style>
 
             <div className="max-w-2xl w-full space-y-4">
 
                 {!hasJoined ? (
-                    /* ── Join form ──────────────────────────────────────────────────── */
+                    /* ── Join form ─────────────────────────────────────────────── */
                     <div className="bg-[#161C27] border border-[#C8861A]/30 p-8 rounded-xl shadow-2xl text-center relative overflow-hidden">
                         <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-10">
                             <MiniHex x={40} y={40} size={30} fill="#C8861A" />
@@ -300,13 +322,14 @@ export default function Player() {
                                 Connect to Board
                             </button>
                         </div>
+
                         <p className="f-body text-[#2A3347] text-xs mt-6">
                             Both <span className="text-[#4A5875]">XXXXX</span> and <span className="text-[#4A5875]">CATAN-XXXXX</span> formats are accepted
                         </p>
                     </div>
 
                 ) : (
-                    /* ── Active session ─────────────────────────────────────────────── */
+                    /* ── Active session ────────────────────────────────────────── */
                     <>
                         {/* Status bar */}
                         <div className="flex items-center justify-between px-2">
@@ -314,8 +337,8 @@ export default function Player() {
                                 <span className={`w-2 h-2 rounded-full ${connStatus === "connected" ? "bg-emerald-500 animate-pulse" :
                                         connStatus === "error" ? "bg-red-500" :
                                             connStatus === "host_gone" ? "bg-yellow-400" :
-                                                "bg-yellow-400 animate-pulse"
-                                    }`} />
+                                                "bg-yellow-400 animate-pulse"}`}
+                                />
                                 <span className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99]">
                                     {statusLabel[connStatus]}
                                 </span>
@@ -328,23 +351,12 @@ export default function Player() {
 
                         {/* Video viewport */}
                         <div className="relative rounded-xl border border-[#2A3347] overflow-hidden bg-black aspect-video shadow-2xl">
+                            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain" />
 
-                            {/*
-                This <video> receives the MediaStream from host's canvas.captureStream().
-                Because the host draws CV results (tile labels, numbers, ports, robber)
-                onto that canvas before streaming, this element shows the fully annotated
-                board — not the raw camera feed.
-              */}
-                            <video
-                                ref={videoRef}
-                                autoPlay
-                                playsInline
-                                className="w-full h-full object-contain"
-                            />
-
-                            {/* Host gone overlay */}
+                            {/* ── Host gone overlay ──────────────────────────────── */}
                             {connStatus === "host_gone" && (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-[#0A0D14]/95 backdrop-blur-sm">
+                                    {/* Pulsing hex icon */}
                                     <div className="pulse-ring">
                                         <svg viewBox="0 0 90 90" className="w-20 h-20">
                                             <polygon
@@ -357,18 +369,25 @@ export default function Player() {
                                             <text x="45" y="53" textAnchor="middle" fontSize="26">⏸</text>
                                         </svg>
                                     </div>
+
                                     <div className="text-center space-y-1">
-                                        <p className="f-cinzel text-sm tracking-[0.25em] uppercase text-yellow-400">Host has left the session</p>
+                                        <p className="f-cinzel text-sm tracking-[0.25em] uppercase text-yellow-400">
+                                            Host has left the session
+                                        </p>
                                         <p className="f-body text-xs text-[#4A5875] max-w-xs">
                                             The room is still open. You'll reconnect automatically when the host returns.
                                         </p>
                                     </div>
+
+                                    {/* Waiting animation — dots */}
                                     <div className="flex items-center gap-1.5">
                                         {[0, 1, 2].map(i => (
                                             <span key={i} className="w-1.5 h-1.5 rounded-full bg-yellow-400/60"
                                                 style={{ animation: `pulseRing 1.4s ease-in-out ${i * 0.2}s infinite` }} />
                                         ))}
                                     </div>
+
+                                    {/* Manual retry */}
                                     <button
                                         onClick={retryConnection}
                                         className="mt-1 px-6 py-2 f-cinzel text-[11px] tracking-[0.3em] uppercase
@@ -381,7 +400,7 @@ export default function Player() {
                                 </div>
                             )}
 
-                            {/* Searching / handshaking overlay */}
+                            {/* ── Searching / handshaking overlay ───────────────── */}
                             {(connStatus === "searching" || connStatus === "handshaking") && (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#0E1117]/90">
                                     <div className="w-14 h-14 border-2 border-[#C8861A] border-t-transparent rounded-full animate-spin" />
@@ -391,7 +410,7 @@ export default function Player() {
                                 </div>
                             )}
 
-                            {/* Error overlay */}
+                            {/* ── Error overlay ─────────────────────────────────── */}
                             {connStatus === "error" && (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#0E1117]/90">
                                     <span className="text-4xl">⚠️</span>
@@ -399,33 +418,22 @@ export default function Player() {
                                     <p className="f-body text-xs text-red-400/70 max-w-xs text-center">
                                         Check that the host session is active and the code is correct.
                                     </p>
-                                    <button
-                                        onClick={retryConnection}
-                                        className="px-5 py-2 f-cinzel text-[11px] tracking-[0.3em] uppercase
-                      border border-red-500/40 text-red-400 hover:border-red-400 hover:bg-red-500/10
-                      transition-all duration-300"
-                                        style={{ clipPath: "polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%)" }}
-                                    >
+                                    <button onClick={retryConnection}
+                                        className="px-5 py-2 f-cinzel text-[11px] tracking-[0.3em] uppercase border border-red-500/40 text-red-400
+                      hover:border-red-400 hover:bg-red-500/10 transition-all duration-300"
+                                        style={{ clipPath: "polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%)" }}>
                                         🔄 Retry
                                     </button>
                                 </div>
                             )}
 
-                            {/* Live badge — shown once the CV stream is flowing */}
+                            {/* ── Live badge ────────────────────────────────────── */}
                             {connStatus === "connected" && (
-                                <>
-                                    <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded
-                    border border-emerald-500/40 bg-[#0E1117]/80 backdrop-blur-sm">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                        <span className="f-cinzel text-[10px] tracking-[0.3em] uppercase text-emerald-400">Live</span>
-                                    </div>
-                                    {/* Inform players they're seeing the processed board */}
-                                    <div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded
-                    border border-[#38BDF8]/30 bg-[#0E1117]/80 backdrop-blur-sm">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-[#38BDF8] animate-pulse" />
-                                        <span className="f-cinzel text-[10px] tracking-[0.3em] uppercase text-[#38BDF8]">CV Board</span>
-                                    </div>
-                                </>
+                                <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded
+                  border border-emerald-500/40 bg-[#0E1117]/80 backdrop-blur-sm">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="f-cinzel text-[10px] tracking-[0.3em] uppercase text-emerald-400">Live</span>
+                                </div>
                             )}
                         </div>
 
@@ -446,10 +454,9 @@ export default function Player() {
                             </div>
                         )}
 
-                        <button
-                            onClick={leave}
-                            className="text-[#4A5875] hover:text-[#C8861A] text-[10px] f-cinzel tracking-widest uppercase transition-colors"
-                        >
+                        <button onClick={leave}
+                            className="text-[#4A5875] hover:text-[#C8861A] text-[10px] f-cinzel tracking-widest uppercase transition-colors">
+    return <video ref={videoRef} autoPlay playsInline style={{ width: "100%" }} />;
                             ← Leave Session
                         </button>
                     </>
@@ -457,5 +464,5 @@ export default function Player() {
             </div>
         </div>
     );
->>>>>>> Stashed changes
+
 }

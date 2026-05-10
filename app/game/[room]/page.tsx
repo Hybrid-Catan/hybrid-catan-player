@@ -6,6 +6,8 @@ import { buildRoad } from "@/lib/api/build/buildRoad";
 import { buildSettlement } from "@/lib/api/build/buildSettlement";
 import { buildCity } from "@/lib/api/build/buildCity";
 import { getGame } from "@/lib/api/game/getGame";
+import { confirmSetupRoad } from "@/lib/api/turn/setup";
+import { rollDice } from "@/lib/api/turn/buffer";
 
 const COLOR_MAP: Record<Player['color'], string> = {
   RED: '#ef4444',
@@ -154,7 +156,6 @@ export default function GamePage() {
     }
     setGameState(result.data);
   }
-
 
   function adjustOffer(map: Partial<Record<ResourceId, number>>, set: (v: Partial<Record<ResourceId, number>>) => void, id: ResourceId, delta: number, max?: number) {
     const cur = map[id] ?? 0
@@ -402,18 +403,11 @@ export default function GamePage() {
     <div className="flex gap-2 pt-4 border-t border-[#2A3347]">
       {isMyTurn && gameState.phase === 'ROLL' ? (
         <button
-          onClick={() => {
-            const d1 = Math.ceil(Math.random() * 6) as 1 | 2 | 3 | 4 | 5 | 6
-            const d2 = Math.ceil(Math.random() * 6) as 1 | 2 | 3 | 4 | 5 | 6
-            setDice([d1, d2])
-            setGameState(prev => {
-              if (!prev) return prev
-              return {
-                ...prev,
-                phase: "TRADE",
-                dice: { sum: d1 + d2 }
-              }
-            })
+          onClick={async () => {
+            const result = await rollDice(gameState)
+
+            setDice(result.dice)
+            setGameState(result.gameState)
           }}
           className="flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase
           bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#0E1117]
@@ -516,48 +510,60 @@ export default function GamePage() {
           </button>
         ) : (
           <button
-            onClick={() => {
+            // onClick={() => {
+            //   setSetupStep('settlement')
+            //   const resourceTypes = ['WOOD', 'BRICK', 'WOOL', 'WHEAT', 'ORE'] as const
+            //   const randomResources = () => {
+            //     const res = { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 }
+            //     for (let i = 0; i < 3; i++) {
+            //       res[resourceTypes[Math.floor(Math.random() * 5)]] += 1
+            //     }
+            //     return res
+            //   }
+            //   if (gameState.phase === 'SETUP_1') {
+            //     setGameState(prev => {
+            //       if (!prev) return prev
+            //       return {
+            //         ...prev,
+            //         phase: "SETUP_2",
+            //       }
+            //     })
+            //   } else {
+            //     const myNewResources = randomResources()
+            //     setResources(myNewResources)
+            //     setGameState(prev => {
+            //       if (!prev) return prev
+            //       return {
+            //         ...prev,
+            //         phase: 'ROLL',
+            //         players: prev.players.map(p => ({
+            //           ...p,
+            //           victoryPoints: 2,
+            //           resourceCards:
+            //             p.playerId === myPlayerId
+            //               ? myNewResources
+            //               : randomResources(),
+            //           pieces: {
+            //             settlementsPlaced: 2,
+            //             citiesPlaced: 0,
+            //             roadsPlaced: 2,
+            //           },
+            //         })),
+            //       }
+            //     })
+            //   }
+            // }}
+            onClick={async () => {
               setSetupStep('settlement')
-              const resourceTypes = ['WOOD', 'BRICK', 'WOOL', 'WHEAT', 'ORE'] as const
-              const randomResources = () => {
-                const res = { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 }
-                for (let i = 0; i < 3; i++) {
-                  res[resourceTypes[Math.floor(Math.random() * 5)]] += 1
-                }
-                return res
+
+              const result = await confirmSetupRoad(gameState)
+
+              if (!result.success) {
+                alert(result.error)
+                return
               }
-              if (gameState.phase === 'SETUP_1') {
-                setGameState(prev => {
-                  if (!prev) return prev
-                  return {
-                    ...prev,
-                    phase: "SETUP_2",
-                  }
-                })
-              } else {
-                const myNewResources = randomResources()
-                setResources(myNewResources)
-                setGameState(prev => {
-                  if (!prev) return prev
-                  return {
-                    ...prev,
-                    phase: 'ROLL',
-                    players: prev.players.map(p => ({
-                      ...p,
-                      victoryPoints: 2,
-                      resourceCards:
-                        p.playerId === myPlayerId
-                          ? myNewResources
-                          : randomResources(),
-                      pieces: {
-                        settlementsPlaced: 2,
-                        citiesPlaced: 0,
-                        roadsPlaced: 2,
-                      },
-                    })),
-                  }
-                })
-              }
+
+              setGameState(result.data)
             }}
             className="flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase
               bg-gradient-to-br from-[#38BDF8] to-[#0284C7] text-[#0E1117] active:scale-[0.98] transition-all">

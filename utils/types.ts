@@ -35,7 +35,7 @@ export type Player = {
         "ratio": "2:1" | "3:1";
     }[];
     "turnState": {
-        "currentPhase": "SETUP" | "ROLL" | "TRADE" | "BUILD" | "END"
+        "currentPhase": "SETUP" | "ROLL" | "BUFFER" | "TRADE" | "BUILD" | "END"
     }
 }
 
@@ -43,7 +43,7 @@ export type GameState = {
     "gameId": string,
     "status": "SETUP" | "IN_PROGRESS" | "FINISHED",
     "players": Player[], // in queue
-    "phase": "SETUP_1" | "SETUP_2" | "ROLL" | "TRADE" | "BUILD" | "END",
+    "phase": "SETUP_1" | "SETUP_2" | "BUFFER" | "ROLL" | "TRADE" | "BUILD" | "END",
 
     "dice": {
         "sum": number

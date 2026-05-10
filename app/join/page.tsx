@@ -21,8 +21,6 @@ export default function EnterCodePage() {
         alert(result.error)
         return
       }
-      console.log("Created Game:", result.data)
-
       router.push(`/join/${roomCode}`)
     } catch (error) {
       console.error(error)

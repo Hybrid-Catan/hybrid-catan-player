@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef } from "react";
 import { useEffect, useRef, useState } from "react";
 
 const MiniHex = ({ x, y, size, fill }: { x: number; y: number; size: number; fill: string }) => {
@@ -25,6 +26,7 @@ const ICE_SERVERS = [
     { urls: "stun:stun2.l.google.com:19302" },
 ];
 
+
 export default function Player() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -34,6 +36,7 @@ export default function Player() {
     // Store the normalised gameId so we can rejoin without re-rendering the join form
     const gameIdRef = useRef<string | null>(null);
     const playerIndexRef = useRef<number>(0);
+
 
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [inputCode, setInputCode] = useState("");
@@ -69,6 +72,9 @@ export default function Player() {
         socketRef.current = socket;
 
         const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+        const pc = new RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
         pcRef.current = pc;
         addLog(`Joining room: ${gid} (player ${pidx})`, "info");
 
@@ -76,6 +82,7 @@ export default function Player() {
             if (videoRef.current) videoRef.current.srcObject = event.streams[0];
             setConnStatus("connected");
             addLog("Stream synchronised. Board is live.", "success");
+
         };
 
         pc.onicecandidate = event => {
@@ -93,6 +100,8 @@ export default function Player() {
             }
         };
 
+        socket.onmessage = async (event) => {
+            const data = JSON.parse(event.data);
         socket.onopen = () => {
             setConnStatus("searching");
             addLog("Signaling socket opened.", "success");
@@ -125,6 +134,7 @@ export default function Player() {
 
             if (data.gameId !== gid) return;
 
+
             if (data.type === "offer") {
                 setConnStatus("handshaking");
                 addLog("SDP offer received — completing handshake…", "info");
@@ -151,6 +161,8 @@ export default function Player() {
                     playerIndex: pidx,
                 }));
                 addLog("SDP answer sent.", "success");
+                socket.send(JSON.stringify({ type: "answer", answer }));
+
 
             } else if (data.type === "ice") {
                 if (!data.candidate) return;
@@ -185,7 +197,27 @@ export default function Player() {
         playerIndexRef.current = pidx;
 
         startSession(gid, pidx);
+        socket.onerror = (err) => console.error("Player WS error:", err);
 
+
+        socket.onerror = () => {
+            addLog("WebSocket connection error.", "error");
+            setConnStatus("error");
+        };
+
+        socket.onclose = () => {
+            addLog("Signaling socket closed.", "warn");
+        };
+    }
+
+    // ── Kick off session when hasJoined flips ───────────────────────────────────
+    useEffect(() => {
+        if (!hasJoined) return;
+        const gid = normaliseGameId(inputCode);
+        gameIdRef.current = gid;
+        const pidx = Math.floor(Math.random() * 3) + 1; // 1–3 (0 = host/red)
+        playerIndexRef.current = pidx;
+        startSession(gid, pidx);
         return () => {
             pcRef.current?.close();
             socketRef.current?.close();
@@ -424,6 +456,7 @@ export default function Player() {
 
                         <button onClick={leave}
                             className="text-[#4A5875] hover:text-[#C8861A] text-[10px] f-cinzel tracking-widest uppercase transition-colors">
+    return <video ref={videoRef} autoPlay playsInline style={{ width: "100%" }} />;
                             ← Leave Session
                         </button>
                     </>
@@ -431,4 +464,5 @@ export default function Player() {
             </div>
         </div>
     );
+
 }

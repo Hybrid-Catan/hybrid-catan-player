@@ -8,6 +8,10 @@ import { buildCity } from "@/lib/api/build/buildCity";
 import { getGame } from "@/lib/api/game/getGame";
 import { confirmSetupRoad } from "@/lib/api/turn/setup";
 import { rollDice } from "@/lib/api/turn/buffer";
+import { acceptTrade } from "@/lib/api/trading/accept";
+import { rejectTrade } from "@/lib/api/trading/reject";
+import { endTurn } from "@/lib/api/turn/end";
+import { newTrade } from "@/lib/api/trading/new";
 
 const COLOR_MAP: Record<Player['color'], string> = {
   RED: '#ef4444',
@@ -360,6 +364,10 @@ export default function GamePage() {
   const isSetupPhase = gameState.phase === 'SETUP_1' || gameState.phase === 'SETUP_2'
   const setupPhaseNum = gameState.phase === 'SETUP_2' ? 2 : 1
 
+  const incomingTrades = ((gameState as any).tradeState?.trades ?? [])
+    .map((trade: any, index: number) => ({ ...trade, index }))
+    .filter((trade: any) => trade.receiver === myPlayerId && trade.isActive)
+
   function toggleTrade() {
     setTradeOpen(v => !v)
     setBuildOpen(false)
@@ -573,7 +581,33 @@ export default function GamePage() {
             const canSend = !!targetPlayer && Object.values(offerGive).some(v => v > 0) && Object.values(offerRequest).some(v => v > 0)
             return (
               <button disabled={!canSend}
-                onClick={() => {
+                onClick={async () => {
+                  if (!targetPlayer) return
+                  const target = otherPlayers.find(p => p.name === targetPlayer)
+                  if (!target) return
+
+                  const fullCards = (partial: Partial<Record<ResourceId, number>>) => ({
+                    WOOD: partial.WOOD ?? 0,
+                    BRICK: partial.BRICK ?? 0,
+                    WOOL: partial.WOOL ?? 0,
+                    WHEAT: partial.WHEAT ?? 0,
+                    ORE: partial.ORE ?? 0,
+                  })
+
+                  const result = await newTrade(
+                    gameState,
+                    myPlayerId,
+                    target.playerId,
+                    fullCards(offerGive),
+                    fullCards(offerRequest)
+                  )
+
+                  if (result.error) {
+                    alert(result.error)
+                    return
+                  }
+
+                  setGameState(result)
                   setSentOffer(targetPlayer)
                   setTimeout(() => { setSentOffer(null); setOfferGive({}); setOfferRequest({}); setTargetPlayer(null); setTradeOpen(false) }, 2000)
                 }}
@@ -603,6 +637,89 @@ export default function GamePage() {
             <span className="f-cinzel text-sm text-[#F0E6CC]">{item}</span>
             <span className="f-body text-sm text-[#8A9AB8]">{costStr}</span>
           </button>
+        )
+      })}
+    </div>
+  )
+
+  const renderTradeCards = (cards: Record<string, number>) => {
+    const entries = Object.entries(cards ?? {}).filter(([, n]) => n > 0)
+    if (entries.length === 0) {
+      return <span className="f-cinzel text-xs text-[#6B7A99]">nothing</span>
+    }
+    return (
+      <span className="flex flex-wrap justify-center gap-2">
+        {entries.map(([res, n]) => {
+          const r = RESOURCES.find(x => x.id === res)
+          return (
+            <span key={res} className="f-cinzel text-sm flex items-center gap-1">
+              <span className="text-base leading-none">{r?.emoji ?? res}</span>
+              <span className="font-bold" style={{ color: r?.color ?? '#F0E6CC' }}>{n}</span>
+            </span>
+          )
+        })}
+      </span>
+    )
+  }
+
+  const incomingTradePanel = incomingTrades.length > 0 && (
+    <div className="slide-up space-y-3 pt-4 border-t border-[#38BDF8]/30">
+      <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#38BDF8] block">
+        Incoming Trade{incomingTrades.length > 1 ? `s (${incomingTrades.length})` : ''}
+      </span>
+      {incomingTrades.map((trade: any) => {
+        const sender = gameState.players.find((p: any) => p.playerId === trade.sender)
+        if (!sender) return null
+        return (
+          <div key={trade.index} className="rounded-xl border-2 border-[#38BDF8]/40 bg-[#38BDF8]/10 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white"
+                style={{ background: COLOR_MAP[sender.color] }}>
+                {sender.name[0]}
+              </div>
+              <span className="f-cinzel text-sm text-[#F0E6CC]">
+                {sender.name} wants to trade
+              </span>
+            </div>
+
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center">
+              <div className="text-center">
+                <p className="f-cinzel text-[10px] text-[#8A9AB8] tracking-wider uppercase mb-1">They give</p>
+                {renderTradeCards(trade.sendingCards)}
+              </div>
+              <span className="f-cinzel text-xl text-[#6B7A99]">⇄</span>
+              <div className="text-center">
+                <p className="f-cinzel text-[10px] text-[#8A9AB8] tracking-wider uppercase mb-1">You give</p>
+                {renderTradeCards(trade.receivingCards)}
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  const result = await rejectTrade(gameState, trade.index)
+                  if (!result.success) { alert(result.error); return }
+                  setGameState(result.data)
+                }}
+                className="flex-1 py-2.5 rounded-lg f-cinzel text-xs font-bold tracking-widest uppercase border border-[#2A3347] bg-[#0A0D14] text-[#8A9AB8] hover:border-red-500/40 hover:text-red-400 transition-all">
+                Reject
+              </button>
+              <button
+                disabled={trade.canAccept === false}
+                onClick={async () => {
+                  const result = await acceptTrade(gameState, trade.index)
+                  if (!result.success) { alert(result.error); return }
+                  setGameState(result.data)
+                }}
+                className={`flex-1 py-2.5 rounded-lg f-cinzel text-xs font-bold tracking-widest uppercase transition-all
+                  ${trade.canAccept === false
+                    ? 'bg-[#0A0D14] border border-[#161C27] text-[#2A3347] cursor-not-allowed'
+                    : 'bg-gradient-to-br from-[#38BDF8] to-[#0284C7] text-[#0E1117] active:scale-[0.98]'
+                  }`}>
+                {trade.canAccept === false ? "Can't Afford" : 'Accept'}
+              </button>
+            </div>
+          </div>
         )
       })}
     </div>
@@ -645,6 +762,16 @@ export default function GamePage() {
             Trade
           </button>
           <button disabled={!isMyTurn}
+            onClick={async () => {
+              const result = await endTurn(gameState)
+              if (!result.success) {
+                alert(result.error)
+                return
+              }
+              setBuildOpen(false)
+              setTradeOpen(false)
+              setGameState(result.data)
+            }}
             className={`flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase transition-all duration-200
               ${isMyTurn
                 ? 'bg-gradient-to-br from-[#38BDF8] to-[#0284C7] text-[#0E1117] active:scale-[0.98]'
@@ -848,9 +975,10 @@ export default function GamePage() {
               <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8] block mb-3">Players</span>
               {playerList}
             </div>
-            {buildOpen && <div className="px-4">{buildPanel}</div>}
-            {tradeOpen && <div className="px-4">{tradePanel}</div>}
-            <div className="px-4 py-6">{actionBar}</div>
+            {buildOpen && <div className="px-5">{buildPanel}</div>}
+            {tradeOpen && <div className="px-5">{tradePanel}</div>}
+            {incomingTradePanel && <div className="px-5">{incomingTradePanel}</div>}
+            <div className="px-5 pb-6">{actionBar}</div>
           </>
         )}
       </div>

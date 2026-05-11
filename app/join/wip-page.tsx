@@ -1,5 +1,4 @@
 "use client";
-import { useEffect, useRef } from "react";
 import { useEffect, useRef, useState } from "react";
 
 const MiniHex = ({ x, y, size, fill }: { x: number; y: number; size: number; fill: string }) => {
@@ -26,17 +25,14 @@ const ICE_SERVERS = [
     { urls: "stun:stun2.l.google.com:19302" },
 ];
 
-
 export default function Player() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const socketRef = useRef<WebSocket | null>(null);
     const iceCandidateBuffer = useRef<RTCIceCandidateInit[]>([]);
     const remoteDescSet = useRef(false);
-    // Store the normalised gameId so we can rejoin without re-rendering the join form
     const gameIdRef = useRef<string | null>(null);
     const playerIndexRef = useRef<number>(0);
-
 
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [inputCode, setInputCode] = useState("");
@@ -58,12 +54,10 @@ export default function Player() {
         setHasJoined(true);
     }
 
-    // ── Core session setup — extracted so we can call it for rejoins too ──
     function startSession(gid: string, pidx: number) {
         iceCandidateBuffer.current = [];
         remoteDescSet.current = false;
 
-        // Tear down any existing PC/socket before creating new ones
         pcRef.current?.close();
         socketRef.current?.close();
 
@@ -72,9 +66,6 @@ export default function Player() {
         socketRef.current = socket;
 
         const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-        const pc = new RTCPeerConnection({
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-        });
         pcRef.current = pc;
         addLog(`Joining room: ${gid} (player ${pidx})`, "info");
 
@@ -82,7 +73,6 @@ export default function Player() {
             if (videoRef.current) videoRef.current.srcObject = event.streams[0];
             setConnStatus("connected");
             addLog("Stream synchronised. Board is live.", "success");
-
         };
 
         pc.onicecandidate = event => {
@@ -100,8 +90,6 @@ export default function Player() {
             }
         };
 
-        socket.onmessage = async (event) => {
-            const data = JSON.parse(event.data);
         socket.onopen = () => {
             setConnStatus("searching");
             addLog("Signaling socket opened.", "success");
@@ -112,28 +100,22 @@ export default function Player() {
         socket.onmessage = async event => {
             const data = JSON.parse(event.data as string);
 
-            // ── Host disconnected ──────────────────────────────────────────
             if (data.type === "host_disconnected") {
                 addLog("Host has disconnected. Waiting for them to rejoin…", "warn");
                 setConnStatus("host_gone");
-                // Clear the video stream
                 if (videoRef.current) videoRef.current.srcObject = null;
-                // Close PC — we'll rebuild it when the host comes back
                 pc.close();
                 return;
             }
 
-            // ── Host reconnected — rebuild WebRTC from scratch ─────────────
             if (data.type === "host_reconnected") {
                 addLog("Host is back! Re-establishing connection…", "success");
                 setConnStatus("searching");
-                // Start a fresh session on the same socket
                 startSession(gid, pidx);
                 return;
             }
 
             if (data.gameId !== gid) return;
-
 
             if (data.type === "offer") {
                 setConnStatus("handshaking");
@@ -161,8 +143,6 @@ export default function Player() {
                     playerIndex: pidx,
                 }));
                 addLog("SDP answer sent.", "success");
-                socket.send(JSON.stringify({ type: "answer", answer }));
-
 
             } else if (data.type === "ice") {
                 if (!data.candidate) return;
@@ -186,31 +166,6 @@ export default function Player() {
         };
     }
 
-    // ── Kick off the session once hasJoined flips ────────────────────────
-    useEffect(() => {
-        if (!hasJoined) return;
-
-        const gid = normaliseGameId(inputCode);
-        gameIdRef.current = gid;
-        // For simplicity use a fixed player index; in a real app this would be assigned by the server
-        const pidx = Math.floor(Math.random() * 3) + 1; // 1–3 (0 = host/red)
-        playerIndexRef.current = pidx;
-
-        startSession(gid, pidx);
-        socket.onerror = (err) => console.error("Player WS error:", err);
-
-
-        socket.onerror = () => {
-            addLog("WebSocket connection error.", "error");
-            setConnStatus("error");
-        };
-
-        socket.onclose = () => {
-            addLog("Signaling socket closed.", "warn");
-        };
-    }
-
-    // ── Kick off session when hasJoined flips ───────────────────────────────────
     useEffect(() => {
         if (!hasJoined) return;
         const gid = normaliseGameId(inputCode);
@@ -240,7 +195,6 @@ export default function Player() {
         if (videoRef.current) videoRef.current.srcObject = null;
     }
 
-    // ── Manual "Try Again" when host is gone ─────────────────────────────
     function retryConnection() {
         const gid = gameIdRef.current;
         if (!gid) return;
@@ -356,7 +310,6 @@ export default function Player() {
                             {/* ── Host gone overlay ──────────────────────────────── */}
                             {connStatus === "host_gone" && (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-[#0A0D14]/95 backdrop-blur-sm">
-                                    {/* Pulsing hex icon */}
                                     <div className="pulse-ring">
                                         <svg viewBox="0 0 90 90" className="w-20 h-20">
                                             <polygon
@@ -379,7 +332,6 @@ export default function Player() {
                                         </p>
                                     </div>
 
-                                    {/* Waiting animation — dots */}
                                     <div className="flex items-center gap-1.5">
                                         {[0, 1, 2].map(i => (
                                             <span key={i} className="w-1.5 h-1.5 rounded-full bg-yellow-400/60"
@@ -387,7 +339,6 @@ export default function Player() {
                                         ))}
                                     </div>
 
-                                    {/* Manual retry */}
                                     <button
                                         onClick={retryConnection}
                                         className="mt-1 px-6 py-2 f-cinzel text-[11px] tracking-[0.3em] uppercase
@@ -456,7 +407,6 @@ export default function Player() {
 
                         <button onClick={leave}
                             className="text-[#4A5875] hover:text-[#C8861A] text-[10px] f-cinzel tracking-widest uppercase transition-colors">
-    return <video ref={videoRef} autoPlay playsInline style={{ width: "100%" }} />;
                             ← Leave Session
                         </button>
                     </>
@@ -464,5 +414,4 @@ export default function Player() {
             </div>
         </div>
     );
-
 }

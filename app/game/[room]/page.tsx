@@ -10,6 +10,8 @@ import { confirmSetupRoad } from "@/lib/api/turn/setup";
 import { rollDice } from "@/lib/api/turn/buffer";
 import { acceptTrade } from "@/lib/api/trading/accept";
 import { rejectTrade } from "@/lib/api/trading/reject";
+import { endTurn } from "@/lib/api/turn/end";
+import { newTrade } from "@/lib/api/trading/new";
 
 const COLOR_MAP: Record<Player['color'], string> = {
   RED: '#ef4444',
@@ -366,7 +368,33 @@ export default function GamePage() {
             const canSend = !!targetPlayer && Object.values(offerGive).some(v => v > 0) && Object.values(offerRequest).some(v => v > 0)
             return (
               <button disabled={!canSend}
-                onClick={() => {
+                onClick={async () => {
+                  if (!targetPlayer) return
+                  const target = otherPlayers.find(p => p.name === targetPlayer)
+                  if (!target) return
+
+                  const fullCards = (partial: Partial<Record<ResourceId, number>>) => ({
+                    WOOD: partial.WOOD ?? 0,
+                    BRICK: partial.BRICK ?? 0,
+                    WOOL: partial.WOOL ?? 0,
+                    WHEAT: partial.WHEAT ?? 0,
+                    ORE: partial.ORE ?? 0,
+                  })
+
+                  const result = await newTrade(
+                    gameState,
+                    myPlayerId,
+                    target.playerId,
+                    fullCards(offerGive),
+                    fullCards(offerRequest)
+                  )
+
+                  if (result.error) {
+                    alert(result.error)
+                    return
+                  }
+
+                  setGameState(result)
                   setSentOffer(targetPlayer)
                   setTimeout(() => {
                     setSentOffer(null)
@@ -528,6 +556,16 @@ export default function GamePage() {
             Trade
           </button>
           <button disabled={!isMyTurn}
+            onClick={async () => {
+              const result = await endTurn(gameState)
+              if (!result.success) {
+                alert(result.error)
+                return
+              }
+              setBuildOpen(false)
+              setTradeOpen(false)
+              setGameState(result.data)
+            }}
             className={`flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase transition-all duration-200
               ${isMyTurn
                 ? 'bg-gradient-to-br from-[#38BDF8] to-[#0284C7] text-[#0E1117] active:scale-[0.98]'

@@ -14,18 +14,7 @@ export default function EnterCodePage() {
   const handleEnter = async () => {
     if (!canEnter) return
     const roomCode = code.trim().toUpperCase()
-    try {
-      const result = await createGame(roomCode)
-
-      if (!result.success) {
-        alert(result.error)
-        return
-      }
-      router.push(`/join/${roomCode}`)
-    } catch (error) {
-      console.error(error)
-      alert("Failed to create game")
-    }
+	router.push(`/join/${roomCode}`)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

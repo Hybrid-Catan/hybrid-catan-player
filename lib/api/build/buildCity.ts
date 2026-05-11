@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:3000";
+import { BASE_URL } from "@/lib/api/config";
 
 export async function buildCity(gameState: any) {
   const res = await fetch(`${BASE_URL}/api/game/build/city`, {

@@ -14,7 +14,7 @@ export default function EnterCodePage() {
   const handleEnter = async () => {
     if (!canEnter) return
     const roomCode = code.trim().toUpperCase()
-	router.push(`/join/${roomCode}`)
+    router.push(`/join/CATAN-${roomCode}`)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

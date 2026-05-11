@@ -8,6 +8,7 @@ import { buildCity } from "@/lib/api/build/buildCity";
 import { getGame } from "@/lib/api/game/getGame";
 import { confirmSetupRoad } from "@/lib/api/turn/setup";
 import { rollDice } from "@/lib/api/turn/buffer";
+import { endTurn } from "@/lib/api/turn/end";
 
 const COLOR_MAP: Record<Player['color'], string> = {
   RED: '#ef4444',
@@ -439,6 +440,16 @@ export default function GamePage() {
             Trade
           </button>
           <button disabled={!isMyTurn}
+            onClick={async () => {
+              const result = await endTurn(gameState)
+              if (!result.success) {
+                alert(result.error)
+                return
+              }
+              setBuildOpen(false)
+              setTradeOpen(false)
+              setGameState(result.data)
+            }}
             className={`flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase transition-all duration-200
               ${isMyTurn
                 ? 'bg-gradient-to-br from-[#38BDF8] to-[#0284C7] text-[#0E1117] active:scale-[0.98]'

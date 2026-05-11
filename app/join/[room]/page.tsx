@@ -11,7 +11,7 @@ const COLORS = [
   { id: 'BLUE', label: 'Blue', dot: '#3b82f6', bg: 'bg-blue-500/20', border: 'border-blue-500/60', playerIndex: 1 },
   { id: 'WHITE', label: 'White', dot: '#f0e6cc', bg: 'bg-stone-300/20', border: 'border-stone-300/60', playerIndex: 2 },
   { id: 'ORANGE', label: 'Orange', dot: '#f97316', bg: 'bg-orange-500/20', border: 'border-orange-500/60', playerIndex: 3 },
-] as const
+] as const  
 
 type ColorId = typeof COLORS[number]['id']
 

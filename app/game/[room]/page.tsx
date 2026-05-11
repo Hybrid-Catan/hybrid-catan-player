@@ -9,6 +9,7 @@ import { getGame } from "@/lib/api/game/getGame";
 import { confirmSetupRoad } from "@/lib/api/turn/setup";
 import { rollDice } from "@/lib/api/turn/buffer";
 import { endTurn } from "@/lib/api/turn/end";
+import { newTrade } from "@/lib/api/trading/new";
 
 const COLOR_MAP: Record<Player['color'], string> = {
   RED: '#ef4444',
@@ -361,7 +362,33 @@ export default function GamePage() {
             const canSend = !!targetPlayer && Object.values(offerGive).some(v => v > 0) && Object.values(offerRequest).some(v => v > 0)
             return (
               <button disabled={!canSend}
-                onClick={() => {
+                onClick={async () => {
+                  if (!targetPlayer) return
+                  const target = otherPlayers.find(p => p.name === targetPlayer)
+                  if (!target) return
+
+                  const fullCards = (partial: Partial<Record<ResourceId, number>>) => ({
+                    WOOD: partial.WOOD ?? 0,
+                    BRICK: partial.BRICK ?? 0,
+                    WOOL: partial.WOOL ?? 0,
+                    WHEAT: partial.WHEAT ?? 0,
+                    ORE: partial.ORE ?? 0,
+                  })
+
+                  const result = await newTrade(
+                    gameState,
+                    myPlayerId,
+                    target.playerId,
+                    fullCards(offerGive),
+                    fullCards(offerRequest)
+                  )
+
+                  if (result.error) {
+                    alert(result.error)
+                    return
+                  }
+
+                  setGameState(result)
                   setSentOffer(targetPlayer)
                   setTimeout(() => {
                     setSentOffer(null)

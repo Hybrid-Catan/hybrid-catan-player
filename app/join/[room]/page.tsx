@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from 'next/navigation'
-import QRCode from 'react-qr-code'
 import { getGame } from '@/lib/api/game/getGame'
 import { addPlayer } from '@/lib/api/game/addPlayer'
 import { startGame } from '@/lib/api/game/startGame'
@@ -72,13 +71,6 @@ export default function JoinRoomPage() {
   const [name, setName] = useState('')
   const [gameState, setGameState] = useState<any>(null)
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null)
-  const [joinUrl, setJoinUrl] = useState('')
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && room) {
-      setJoinUrl(`${window.location.origin}/join/${room}`)
-    }
-  }, [room])
 
   const takenColors = new Set(gameState?.players?.map((p: any) => p.color) ?? [])
   const selectedColor = COLORS.find(c => c.id === color)!
@@ -187,18 +179,7 @@ export default function JoinRoomPage() {
               Your spot will appear in the lobby instantly.
             </p>
 
-            <div className="max-w-sm space-y-4">
-              {joinUrl && (
-                <div className="rounded-xl border border-[#C8861A]/30 bg-[#0E1117] p-4 flex items-center gap-4">
-                  <div className="bg-white p-2 rounded">
-                    <QRCode value={joinUrl} size={96} bgColor="#FFFFFF" fgColor="#000000" />
-                  </div>
-                  <div>
-                    <p className="f-cinzel text-[11px] text-[#F0C060] tracking-[0.3em] uppercase mb-1">Scan to Join</p>
-                    <p className="f-body text-xs text-[#8A9AB8]">Point your phone camera at the code to jump straight into this room.</p>
-                  </div>
-                </div>
-              )}
+            <div className="max-w-sm">
               <PlayerLobby gameState={gameState} name={name} colorId={color} />
             </div>
           </div>

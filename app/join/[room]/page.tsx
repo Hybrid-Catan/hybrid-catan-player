@@ -11,7 +11,7 @@ const COLORS = [
   { id: 'BLUE', label: 'Blue', dot: '#3b82f6', bg: 'bg-blue-500/20', border: 'border-blue-500/60', playerIndex: 1 },
   { id: 'WHITE', label: 'White', dot: '#f0e6cc', bg: 'bg-stone-300/20', border: 'border-stone-300/60', playerIndex: 2 },
   { id: 'ORANGE', label: 'Orange', dot: '#f97316', bg: 'bg-orange-500/20', border: 'border-orange-500/60', playerIndex: 3 },
-] as const  
+] as const
 
 type ColorId = typeof COLORS[number]['id']
 
@@ -94,12 +94,23 @@ export default function JoinRoomPage() {
   const selectedColor = COLORS.find(c => c.id === color)!
   const canJoin = name.trim().length > 0 && !takenColors.has(color)
 
-  useEffect(() => {
+    useEffect(() => {
+    let cancelled = false
+
     async function load() {
       const data = await getGame(roomId)
-      if (data.success) setGameState(data.data)
+      if (!cancelled && data.success) {
+        setGameState(data.data)
+      }
     }
+    // Initial fetch
     load()
+    // Poll every 2 seconds
+    const interval = setInterval(load, 2000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [roomId])
 
   // Once we have a playerId + playerIndex, open the WebRTC signaling connection
@@ -212,12 +223,23 @@ export default function JoinRoomPage() {
 
   const handleJoin = async () => {
     const data = await addPlayer({
-      gameState,
+      gameId: roomId,
       name,
       color,
       sequence: gameState.players.length + 1,
     })
-
+    if (!data.success) {
+      // Someone grabbed the color first
+      if (data.error === 'COLOR_TAKEN') {
+        // Refresh lobby state immediately
+        const refreshed = await getGame(roomId)
+        if (refreshed.success) {
+          setGameState(refreshed.data)
+        }
+        alert('That color was just taken by another player.')
+        return
+      }
+    }
     if (data.success) {
       setGameState(data.data)
       const myPlayer = data.data.players.find((p: any) => p.name === name && p.color === color)

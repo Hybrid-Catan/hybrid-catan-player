@@ -1,7 +1,7 @@
 import { BASE_URL } from "@/lib/api/config";
 
 export async function addPlayer(payload: {
-  gameState: any;
+  gameId: any;
   name: string;
   color: string;
   sequence: number;

@@ -79,13 +79,12 @@ export default function JoinRoomPage() {
   useEffect(() => {
     async function load() {
       const data = await getGame(room as string)
-
-      if (data.success) {
-        setGameState(data.data)
-      }
+      if (data.success) setGameState(data.data)
     }
 
     load()
+    const interval = setInterval(load, 2000)
+    return () => clearInterval(interval)
   }, [room])
 
   const handleJoin = async () => {
@@ -285,7 +284,8 @@ export default function JoinRoomPage() {
           </div>
           <button
             onClick={handleStart}
-            className="w-full bg-green-500 p-4 rounded font-bold mt-10"
+            disabled={!myPlayerId}
+            className={`w-full p-4 rounded font-bold mt-10 ${myPlayerId ? 'bg-green-500' : 'bg-green-900 opacity-40 cursor-not-allowed'}`}
           >
             Start Game
           </button>

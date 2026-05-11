@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import type { GameState, Player } from '@/utils/types'
 import { buildRoad } from "@/lib/api/build/buildRoad";
@@ -60,6 +60,101 @@ function Die({ value }: { value: number }) {
   )
 }
 
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+]
+
+type StreamStatus = 'idle' | 'connecting' | 'connected' | 'host_gone' | 'error'
+
+// ── Board Camera Panel ────────────────────────────────────────────────────────
+function BoardCamera({
+  streamStatus,
+  videoRef,
+  onRetry,
+}: {
+  streamStatus: StreamStatus
+  videoRef: React.RefObject<HTMLVideoElement>
+  onRetry: () => void
+}) {
+  return (
+    <div className="relative rounded-xl border border-[#2A3347] overflow-hidden bg-[#060A10]" style={{ aspectRatio: '16/9' }}>
+      {/* Corner brackets */}
+      {(['top-2 left-2', 'top-2 right-2', 'bottom-2 left-2', 'bottom-2 right-2'] as const).map((pos, i) => (
+        <div key={i} className={`absolute ${pos} w-4 h-4 pointer-events-none`} style={{
+          borderTop: i < 2 ? '1.5px solid rgba(200,134,26,.5)' : undefined,
+          borderBottom: i >= 2 ? '1.5px solid rgba(200,134,26,.5)' : undefined,
+          borderLeft: i % 2 === 0 ? '1.5px solid rgba(200,134,26,.5)' : undefined,
+          borderRight: i % 2 === 1 ? '1.5px solid rgba(200,134,26,.5)' : undefined,
+        }} />
+      ))}
+
+      {/* Video element — always mounted so the stream can attach */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className={`w-full h-full object-contain transition-opacity duration-500 ${streamStatus === 'connected' ? 'opacity-100' : 'opacity-0'}`}
+      />
+
+      {/* ── Connecting / handshaking ── */}
+      {(streamStatus === 'idle' || streamStatus === 'connecting') && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#060A10]">
+          <div className="w-10 h-10 border-2 border-[#C8861A] border-t-transparent rounded-full animate-spin" />
+          <p className="f-cinzel text-[10px] tracking-[0.3em] uppercase text-[#4A5875]">
+            {streamStatus === 'idle' ? 'Initialising stream…' : 'Connecting to board…'}
+          </p>
+        </div>
+      )}
+
+      {/* ── Host gone ── */}
+      {streamStatus === 'host_gone' && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#060A10]/95 backdrop-blur-sm">
+          <div style={{ animation: 'pulseRing 2s ease-in-out infinite' }}>
+            <svg viewBox="0 0 80 80" className="w-16 h-16">
+              <polygon
+                points={Array.from({ length: 6 }, (_, i) => {
+                  const a = (Math.PI / 180) * (60 * i - 30)
+                  return `${40 + 34 * Math.cos(a)},${40 + 34 * Math.sin(a)}`
+                }).join(' ')}
+                fill="rgba(234,179,8,.08)" stroke="rgba(234,179,8,.5)" strokeWidth="1.5"
+              />
+              <text x="40" y="47" textAnchor="middle" fontSize="22">⏸</text>
+            </svg>
+          </div>
+          <div className="text-center space-y-1">
+            <p className="f-cinzel text-xs tracking-[0.25em] uppercase text-yellow-400">Host disconnected</p>
+            <p className="f-body text-xs text-[#4A5875] max-w-[200px]">Reconnecting automatically when host returns.</p>
+          </div>
+          <button
+            onClick={onRetry}
+            className="mt-1 px-5 py-1.5 f-cinzel text-[10px] tracking-[0.3em] uppercase border border-[#C8861A]/40 text-[#C8861A] hover:border-[#C8861A] hover:bg-[#C8861A]/10 transition-all duration-300"
+            style={{ clipPath: 'polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%)' }}
+          >
+            🔄 Retry
+          </button>
+        </div>
+      )}
+
+      {/* ── Error ── */}
+      {streamStatus === 'error' && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#060A10]/95">
+          <span className="text-3xl">⚠️</span>
+          <p className="f-cinzel text-[10px] tracking-widest uppercase text-red-400">Stream unavailable</p>
+          <button
+            onClick={onRetry}
+            className="px-5 py-1.5 f-cinzel text-[10px] tracking-[0.3em] uppercase border border-red-500/40 text-red-400 hover:border-red-400 hover:bg-red-500/10 transition-all duration-300"
+            style={{ clipPath: 'polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%)' }}
+          >
+            🔄 Retry
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function GamePage() {
   const params = useParams()
   const room = (params.room as string).toUpperCase()
@@ -82,6 +177,18 @@ export default function GamePage() {
   const [targetPlayer, setTargetPlayer] = useState<string | null>(null)
   const [sentOffer, setSentOffer] = useState<string | null>(null)
 
+  // ── WebRTC ────────────────────────────────────────────────────────────────
+  const boardVideoRef = useRef<HTMLVideoElement | null>(null)
+  const pcRef = useRef<RTCPeerConnection | null>(null)
+  const socketRef = useRef<WebSocket | null>(null)
+  const iceCandidateBuffer = useRef<RTCIceCandidateInit[]>([])
+  const remoteDescSet = useRef(false)
+  const playerIndexRef = useRef<number>(0)
+  const playerColorRef = useRef<string>('')
+
+  const [streamStatus, setStreamStatus] = useState<StreamStatus>('idle')
+
+  // ── Game polling ──────────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
       const data = await getGame(room)
@@ -96,6 +203,140 @@ export default function GamePage() {
     return () => clearInterval(interval)
   }, [room])
 
+  // ── WebRTC session ────────────────────────────────────────────────────────
+  function startRTCSession() {
+    const wsUrl = process.env.NEXT_PUBLIC_HOST_WS
+    if (!wsUrl) {
+      console.warn('[RTC] NEXT_PUBLIC_HOST_WS not set — skipping board stream')
+      return
+    }
+
+    // Read player context set by the join page
+    const storedIndex = sessionStorage.getItem(`hc_playerIndex_${room}`)
+    const storedColor = sessionStorage.getItem(`hc_playerColor_${room}`)
+    const storedId    = sessionStorage.getItem(`hc_playerId_${room}`)
+
+    const playerIndex = storedIndex !== null ? Number(storedIndex) : 1
+    const playerColor = storedColor ?? ''
+    playerIndexRef.current = playerIndex
+    playerColorRef.current = playerColor
+
+    // Clean up any previous session
+    pcRef.current?.close()
+    socketRef.current?.close()
+    iceCandidateBuffer.current = []
+    remoteDescSet.current = false
+
+    setStreamStatus('connecting')
+
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    pcRef.current = pc
+
+    pc.ontrack = (event) => {
+      const [stream] = event.streams
+      if (boardVideoRef.current) {
+        boardVideoRef.current.srcObject = stream
+      }
+      setStreamStatus('connected')
+    }
+
+    pc.onicecandidate = (event) => {
+      const ws = socketRef.current
+      if (event.candidate && ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'ice',
+          candidate: event.candidate,
+          gameId: room,
+        }))
+      }
+    }
+
+    pc.oniceconnectionstatechange = () => {
+      const state = pc.iceConnectionState
+      if (state === 'failed') {
+        pc.restartIce()
+      }
+      if (state === 'disconnected') {
+        setStreamStatus('host_gone')
+      }
+    }
+
+    const socket = new WebSocket(wsUrl)
+    socketRef.current = socket
+
+    socket.onopen = () => {
+      socket.send(JSON.stringify({
+        type: 'join_room',
+        gameId: room,
+        playerIndex,
+        playerColor,
+        playerId: storedId ?? myPlayerId,
+      }))
+    }
+
+    socket.onmessage = async (event) => {
+      const data = JSON.parse(event.data as string)
+
+      if (data.type === 'host_disconnected') {
+        setStreamStatus('host_gone')
+        if (boardVideoRef.current) boardVideoRef.current.srcObject = null
+        pc.close()
+        return
+      }
+
+      if (data.type === 'host_reconnected') {
+        startRTCSession()
+        return
+      }
+
+      if (data.gameId && data.gameId !== room) return
+
+      if (data.type === 'offer') {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.offer))
+        remoteDescSet.current = true
+
+        for (const candidate of iceCandidateBuffer.current) {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.warn)
+        }
+        iceCandidateBuffer.current = []
+
+        const answer = await pc.createAnswer()
+        await pc.setLocalDescription(answer)
+
+        socket.send(JSON.stringify({
+          type: 'answer',
+          answer,
+          gameId: room,
+          playerIndex,
+        }))
+
+      } else if (data.type === 'ice') {
+        if (!data.candidate) return
+        if (!remoteDescSet.current) {
+          iceCandidateBuffer.current.push(data.candidate)
+        } else {
+          await pc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(console.warn)
+        }
+      }
+    }
+
+    socket.onerror = () => setStreamStatus('error')
+    socket.onclose  = () => {
+      // Only flag as error if we were previously live — avoids false alarms on clean unmount
+      setStreamStatus(prev => prev === 'connected' ? 'host_gone' : prev)
+    }
+  }
+
+  useEffect(() => {
+    startRTCSession()
+    return () => {
+      pcRef.current?.close()
+      socketRef.current?.close()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room])
+
+  // ── Guard ─────────────────────────────────────────────────────────────────
   if (!gameState) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0E1117] text-white">
@@ -122,45 +363,28 @@ export default function GamePage() {
   function toggleTrade() {
     setTradeOpen(v => !v)
     setBuildOpen(false)
-    setGameState(prev => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        phase: "TRADE",
-      }
-    })
+    setGameState(prev => prev ? { ...prev, phase: 'TRADE' } : prev)
   }
   function toggleBuild() {
     setBuildOpen(v => !v)
     setTradeOpen(false)
-    setGameState(prev => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        phase: "BUILD",
-      }
-    })
+    setGameState(prev => prev ? { ...prev, phase: 'BUILD' } : prev)
   }
   async function handleBuild(item: string) {
     let result;
-    if (item === "Road") {
-      result = await buildRoad(gameState);
-    }
-    else if (item === "Settlement") {
-      result = await buildSettlement(gameState);
-    }
-    else if (item === "City") {
-      result = await buildCity(gameState);
-    }
-    if (!result.success) {
-      alert(result.error);
-      return;
-    }
-    setGameState(result.data);
+    if (item === 'Road')       result = await buildRoad(gameState)
+    else if (item === 'Settlement') result = await buildSettlement(gameState)
+    else if (item === 'City')  result = await buildCity(gameState)
+    if (!result.success) { alert(result.error); return }
+    setGameState(result.data)
   }
 
-  function adjustOffer(map: Partial<Record<ResourceId, number>>, set: (v: Partial<Record<ResourceId, number>>) => void, id: ResourceId, delta: number, max?: number) {
-    const cur = map[id] ?? 0
+  function adjustOffer(
+    map: Partial<Record<ResourceId, number>>,
+    set: (v: Partial<Record<ResourceId, number>>) => void,
+    id: ResourceId, delta: number, max?: number
+  ) {
+    const cur  = map[id] ?? 0
     const next = Math.min(Math.max(cur + delta, 0), max ?? Infinity)
     set({ ...map, [id]: next })
   }
@@ -168,10 +392,11 @@ export default function GamePage() {
   const myTotalCards = totalCards(me.resources)
   const diceSum = dice[0] + dice[1]
 
+  // ── Sub-components ────────────────────────────────────────────────────────
   const resourceGrid = (
     <div className="grid grid-cols-5 gap-2 lg:gap-3">
       {RESOURCES.map(r => {
-        const count = me.resources[r.id]
+        const count  = me.resources[r.id]
         const active = count > 0
         return (
           <div key={r.id}
@@ -198,9 +423,7 @@ export default function GamePage() {
             style={{ background: COLOR_MAP[p.color] }}>
             {p.name[0]}
           </div>
-          <span className="f-body text-base flex-1" style={{ color: '#8A9AB8' }}>
-            {p.name}
-          </span>
+          <span className="f-body text-base flex-1" style={{ color: '#8A9AB8' }}>{p.name}</span>
           <span className="f-cinzel text-xs text-[#8A9AB8]">{totalCards(p.resourceCards)} cards</span>
           <span className="f-cinzel text-sm font-bold text-[#C8861A]">{p.victoryPoints} VP</span>
         </div>
@@ -228,7 +451,7 @@ export default function GamePage() {
             <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">You Give ×4</p>
             <div className="grid grid-cols-5 gap-1.5">
               {RESOURCES.map(r => {
-                const enough = me.resources[r.id] >= 4
+                const enough   = me.resources[r.id] >= 4
                 const selected = bankGive === r.id
                 return (
                   <button key={r.id} disabled={!enough}
@@ -244,7 +467,6 @@ export default function GamePage() {
               })}
             </div>
           </div>
-
           <div>
             <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">You Get ×1</p>
             <div className="grid grid-cols-5 gap-1.5">
@@ -263,7 +485,6 @@ export default function GamePage() {
               })}
             </div>
           </div>
-
           <button disabled={!bankCanTrade}
             onClick={() => {
               if (!bankGive || !bankGet) return
@@ -272,9 +493,7 @@ export default function GamePage() {
                 [bankGive]: prev[bankGive] - 4,
                 [bankGet]: prev[bankGet] + 1,
               }))
-              setBankGive(null)
-              setBankGet(null)
-              setTradeOpen(false)
+              setBankGive(null); setBankGet(null); setTradeOpen(false)
             }}
             className={`w-full py-3 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase transition-all
               ${bankCanTrade ? 'bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#0E1117] active:scale-[0.98]' : 'bg-[#0A0D14] border border-[#161C27] text-[#2A3347] cursor-not-allowed'}`}>
@@ -287,7 +506,7 @@ export default function GamePage() {
             <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">You Offer</p>
             <div className="grid grid-cols-5 gap-1.5">
               {RESOURCES.map(r => {
-                const given = offerGive[r.id] ?? 0
+                const given   = offerGive[r.id] ?? 0
                 const maxGive = me.resources[r.id]
                 return (
                   <div key={r.id} className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg border border-[#2A3347] bg-[#0A0D14]">
@@ -306,14 +525,13 @@ export default function GamePage() {
               })}
             </div>
           </div>
-
           <div>
             <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">You Request</p>
             <div className="grid grid-cols-5 gap-1.5">
               {RESOURCES.map(r => {
-                const requested = offerRequest[r.id] ?? 0
-                const target = otherPlayers.find(p => p.name === targetPlayer)
-                const maxRequest = target ? totalCards(target.resourceCards) : 0
+                const requested   = offerRequest[r.id] ?? 0
+                const target      = otherPlayers.find(p => p.name === targetPlayer)
+                const maxRequest  = target ? totalCards(target.resourceCards) : 0
                 return (
                   <div key={r.id} className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg border border-[#2A3347] bg-[#0A0D14]">
                     <span className="text-base leading-none">{r.emoji}</span>
@@ -331,16 +549,12 @@ export default function GamePage() {
               })}
             </div>
           </div>
-
           <div>
             <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">Send To</p>
             <div className="flex gap-2">
               {otherPlayers.map(p => (
                 <button key={p.playerId} onClick={() => {
-                  if (targetPlayer !== p.name) {
-                    setOfferGive({})
-                    setOfferRequest({})
-                  }
+                  if (targetPlayer !== p.name) { setOfferGive({}); setOfferRequest({}) }
                   setTargetPlayer(targetPlayer === p.name ? null : p.name)
                 }}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all f-body text-sm
@@ -351,7 +565,6 @@ export default function GamePage() {
               ))}
             </div>
           </div>
-
           {sentOffer ? (
             <div className="flex items-center justify-center gap-2 py-3 rounded-xl border border-[#38BDF8]/30 bg-[#38BDF8]/5">
               <span className="f-cinzel text-sm text-[#38BDF8] tracking-wide">Offer sent to {sentOffer}</span>
@@ -362,13 +575,7 @@ export default function GamePage() {
               <button disabled={!canSend}
                 onClick={() => {
                   setSentOffer(targetPlayer)
-                  setTimeout(() => {
-                    setSentOffer(null)
-                    setOfferGive({})
-                    setOfferRequest({})
-                    setTargetPlayer(null)
-                    setTradeOpen(false)
-                  }, 2000)
+                  setTimeout(() => { setSentOffer(null); setOfferGive({}); setOfferRequest({}); setTargetPlayer(null); setTradeOpen(false) }, 2000)
                 }}
                 className={`w-full py-3 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase transition-all
                   ${canSend ? 'bg-gradient-to-br from-[#38BDF8] to-[#0284C7] text-[#0E1117] active:scale-[0.98]' : 'bg-[#0A0D14] border border-[#161C27] text-[#2A3347] cursor-not-allowed'}`}>
@@ -385,7 +592,7 @@ export default function GamePage() {
     <div className="slide-up space-y-2 pt-4 border-t border-[#2A3347]">
       {Object.entries(BUILD_COSTS).map(([item, cost]) => {
         const affordable = canAfford(me.resources, cost)
-        const costStr = Object.entries(cost).map(([r, n]) => `${n} ${r}`).join(' · ')
+        const costStr    = Object.entries(cost).map(([r, n]) => `${n} ${r}`).join(' · ')
         return (
           <button key={item} disabled={!affordable} onClick={() => handleBuild(item)}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-200
@@ -407,13 +614,12 @@ export default function GamePage() {
         <button
           onClick={async () => {
             const result = await rollDice(gameState)
-
             setDice(result.dice)
             setGameState(result.gameState)
           }}
           className="flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase
-          bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#0E1117]
-          hover:from-[#E8A52A] hover:to-[#C07E18] active:scale-[0.98] transition-all">
+            bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#0E1117]
+            hover:from-[#E8A52A] hover:to-[#C07E18] active:scale-[0.98] transition-all">
           Roll Dice
         </button>
       ) : (
@@ -512,59 +718,10 @@ export default function GamePage() {
           </button>
         ) : (
           <button
-            // onClick={() => {
-            //   setSetupStep('settlement')
-            //   const resourceTypes = ['WOOD', 'BRICK', 'WOOL', 'WHEAT', 'ORE'] as const
-            //   const randomResources = () => {
-            //     const res = { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 }
-            //     for (let i = 0; i < 3; i++) {
-            //       res[resourceTypes[Math.floor(Math.random() * 5)]] += 1
-            //     }
-            //     return res
-            //   }
-            //   if (gameState.phase === 'SETUP_1') {
-            //     setGameState(prev => {
-            //       if (!prev) return prev
-            //       return {
-            //         ...prev,
-            //         phase: "SETUP_2",
-            //       }
-            //     })
-            //   } else {
-            //     const myNewResources = randomResources()
-            //     setResources(myNewResources)
-            //     setGameState(prev => {
-            //       if (!prev) return prev
-            //       return {
-            //         ...prev,
-            //         phase: 'ROLL',
-            //         players: prev.players.map(p => ({
-            //           ...p,
-            //           victoryPoints: 2,
-            //           resourceCards:
-            //             p.playerId === myPlayerId
-            //               ? myNewResources
-            //               : randomResources(),
-            //           pieces: {
-            //             settlementsPlaced: 2,
-            //             citiesPlaced: 0,
-            //             roadsPlaced: 2,
-            //           },
-            //         })),
-            //       }
-            //     })
-            //   }
-            // }}
             onClick={async () => {
               setSetupStep('settlement')
-
               const result = await confirmSetupRoad(gameState)
-
-              if (!result.success) {
-                alert(result.error)
-                return
-              }
-
+              if (!result.success) { alert(result.error); return }
               setGameState(result.data)
             }}
             className="flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase
@@ -582,6 +739,7 @@ export default function GamePage() {
     </div>
   )
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#0E1117] text-[#F0E6CC]">
 
@@ -589,16 +747,18 @@ export default function GamePage() {
         @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:wght@300;400;600&display=swap');
         .f-cinzel { font-family: 'Cinzel', serif; }
         .f-body   { font-family: 'Crimson Pro', serif; }
-        @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
-        @keyframes hexFade { 0%,100%{opacity:.03} 50%{opacity:.07} }
-        .slide-up { animation: slideUp .2s ease both; }
-        .hex-fade { animation: hexFade 5s ease-in-out infinite; }
+        @keyframes slideUp   { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+        @keyframes hexFade   { 0%,100%{opacity:.03} 50%{opacity:.07} }
+        @keyframes pulseRing { 0%,100%{transform:scale(1);opacity:.6} 50%{transform:scale(1.15);opacity:1} }
+        .slide-up  { animation: slideUp .2s ease both; }
+        .hex-fade  { animation: hexFade 5s ease-in-out infinite; }
         .amber-glow { text-shadow: 0 0 20px rgba(200,134,26,.7); }
       `}</style>
 
-      {/* Mobile */}
+      {/* ════ MOBILE ════ */}
       <div className="flex flex-col min-h-screen lg:hidden">
 
+        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A3347]">
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full" style={{ background: COLOR_MAP[me.color] }} />
@@ -611,14 +771,40 @@ export default function GamePage() {
           </div>
         </div>
 
-        <div className={`px-5 py-3.5 flex items-center justify-between border-b border-[#2A3347]
-          ${isMyTurn ? 'bg-[#C8861A]/10' : 'bg-[#090C12]'}`}>
+        {/* Board camera — always visible on mobile */}
+        <div className="px-4 pt-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="f-cinzel text-[10px] tracking-[0.35em] uppercase text-[#8A9AB8]">Board</span>
+            <div className="flex items-center gap-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                streamStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
+                streamStatus === 'error'     ? 'bg-red-500' :
+                streamStatus === 'host_gone' ? 'bg-yellow-400' :
+                                               'bg-yellow-400 animate-pulse'
+              }`} />
+              <span className="f-cinzel text-[9px] tracking-widest uppercase text-[#6B7A99]">
+                {streamStatus === 'connected' ? 'Live' :
+                 streamStatus === 'host_gone' ? 'Host gone' :
+                 streamStatus === 'error'     ? 'Error' : 'Connecting…'}
+              </span>
+            </div>
+          </div>
+          <BoardCamera
+            streamStatus={streamStatus}
+            videoRef={boardVideoRef}
+            onRetry={startRTCSession}
+          />
+        </div>
+
+        {/* Turn banner */}
+        <div className={`mx-4 mt-3 px-4 py-3 rounded-xl flex items-center justify-between border
+          ${isMyTurn ? 'border-[#C8861A]/40 bg-[#C8861A]/10' : 'border-[#2A3347] bg-[#090C12]'}`}>
           <div>
             {isMyTurn
               ? <p className="f-cinzel text-sm font-bold text-[#F0C060] amber-glow">Your Turn</p>
               : <p className="f-body text-sm text-[#8A9AB8]">
-                <span className="font-semibold" style={{ color: COLOR_MAP[currentTurnPlayer.color] }}>{currentTurnPlayer.name}</span>{`'s turn`}
-              </p>
+                  <span className="font-semibold" style={{ color: COLOR_MAP[currentTurnPlayer.color] }}>{currentTurnPlayer.name}</span>{`'s turn`}
+                </p>
             }
             <p className="f-cinzel text-[10px] text-[#6B7A99] tracking-widest uppercase mt-0.5">
               {isSetupPhase
@@ -639,36 +825,37 @@ export default function GamePage() {
           )}
         </div>
 
+        {/* Main content */}
         {isSetupPhase ? (
           <>
-            {isMyTurn && <div className="px-5 pt-5 pb-4">{setupInstructionCard}</div>}
-            <div className="px-5 pb-4 flex-1">
+            {isMyTurn && <div className="px-4 pt-4">{setupInstructionCard}</div>}
+            <div className="px-4 pt-4 flex-1">
               <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8] block mb-3">Setup Progress</span>
               {setupProgress}
             </div>
-            <div className="px-5 pb-6">{setupActionBar}</div>
+            <div className="px-4 py-6">{setupActionBar}</div>
           </>
         ) : (
           <>
-            <div className="px-5 pt-5 pb-4">
+            <div className="px-4 pt-4">
               <div className="flex items-baseline justify-between mb-3">
                 <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Resources</span>
                 <span className="f-body text-xs text-[#8A9AB8]">{myTotalCards} cards</span>
               </div>
               {resourceGrid}
             </div>
-            <div className="px-5 pb-4 flex-1">
+            <div className="px-4 pt-4 flex-1">
               <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8] block mb-3">Players</span>
               {playerList}
             </div>
-            {buildOpen && <div className="px-5">{buildPanel}</div>}
-            {tradeOpen && <div className="px-5">{tradePanel}</div>}
-            <div className="px-5 pb-6">{actionBar}</div>
+            {buildOpen && <div className="px-4">{buildPanel}</div>}
+            {tradeOpen && <div className="px-4">{tradePanel}</div>}
+            <div className="px-4 py-6">{actionBar}</div>
           </>
         )}
       </div>
 
-      {/* Desktop */}
+      {/* ════ DESKTOP ════ */}
       <div className="hidden lg:block relative min-h-screen">
 
         <svg className="absolute inset-0 w-full h-full pointer-events-none hex-fade" xmlns="http://www.w3.org/2000/svg">
@@ -685,8 +872,10 @@ export default function GamePage() {
           )}
         </svg>
 
-        <div className="relative z-10 max-w-4xl mx-auto px-8 py-10 flex flex-col gap-6 min-h-screen">
+        {/* Three-column layout: left sidebar | board | right sidebar */}
+        <div className="relative z-10 max-w-[1400px] mx-auto px-6 py-8 flex flex-col gap-5 min-h-screen">
 
+          {/* ── Top bar ── */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <svg viewBox="0 0 28 28" className="w-7 h-7">
@@ -708,14 +897,15 @@ export default function GamePage() {
             </div>
           </div>
 
+          {/* ── Turn banner ── */}
           <div className={`flex items-center justify-between px-6 py-4 rounded-xl border
             ${isMyTurn ? 'border-[#C8861A]/40 bg-[#C8861A]/10' : 'border-[#2A3347] bg-[#161C27]'}`}>
             <div>
               {isMyTurn
                 ? <p className="f-cinzel text-xl font-bold text-[#F0C060] amber-glow">Your Turn</p>
                 : <p className="f-body text-xl text-[#8A9AB8]">
-                  <span className="font-semibold" style={{ color: COLOR_MAP[currentTurnPlayer.color] }}>{currentTurnPlayer.name}</span>{`'s turn`}
-                </p>
+                    <span className="font-semibold" style={{ color: COLOR_MAP[currentTurnPlayer.color] }}>{currentTurnPlayer.name}</span>{`'s turn`}
+                  </p>
               }
               <p className="f-cinzel text-xs text-[#6B7A99] tracking-widest uppercase mt-1">
                 {isSetupPhase
@@ -736,70 +926,97 @@ export default function GamePage() {
             )}
           </div>
 
-          {isSetupPhase ? (
-            <div className="grid grid-cols-[1fr_1.4fr] gap-6 flex-1">
-              <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-6 flex flex-col gap-4">
-                <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Setup Progress</span>
-                {setupProgress}
-              </div>
-              <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-6 flex flex-col gap-5">
-                <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">
-                  {isMyTurn
-                    ? (setupStep === 'settlement' ? 'Place Settlement' : 'Place Road')
-                    : `Waiting for ${currentTurnPlayer.name}`}
-                </span>
-                {isMyTurn ? (
-                  <>{setupInstructionCard}</>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center rounded-xl border border-[#2A3347] bg-[#0A0D14]">
-                    <div className="text-center space-y-2">
-                      <div className="text-3xl opacity-30">⏳</div>
-                      <p className="f-cinzel text-xs text-[#6B7A99] tracking-widest uppercase">
-                        {currentTurnPlayer.name} is placing pieces
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <div className="flex-1" />
-                {setupActionBar}
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-[1fr_1.4fr] gap-6 flex-1">
-              <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-6 flex flex-col gap-4">
-                <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Standings</span>
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 bg-[#0A0D14]"
-                  style={{ borderColor: isMyTurn ? `${COLOR_MAP[me.color]}99` : '#161C27' }}>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0"
-                    style={{ background: COLOR_MAP[me.color] }}>
-                    {me.name[0]}
-                  </div>
-                  <span className="f-body text-base flex-1 text-[#F0E6CC]">
-                    {me.name}
-                    <span className="f-cinzel text-[9px] text-[#C8861A] tracking-widest uppercase ml-2">you</span>
-                  </span>
-                  <span className="f-cinzel text-xs text-[#8A9AB8]">{myTotalCards} cards</span>
-                  <span className="f-cinzel text-sm font-bold text-[#C8861A]">{me.victoryPoints} VP</span>
-                </div>
-                {playerList}
-              </div>
-              <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-6 flex flex-col gap-5">
-                <div className="flex items-baseline justify-between">
-                  <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Resources</span>
-                  <span className="f-body text-sm text-[#8A9AB8]">{myTotalCards} cards</span>
-                </div>
-                {resourceGrid}
-                <div className="flex-1" />
-                {buildPanel}
-                {tradePanel}
-                {actionBar}
-              </div>
-            </div>
-          )}
+          {/* ── Three-column content ── */}
+          <div className="grid grid-cols-[280px_1fr_320px] gap-5 flex-1">
 
+            {/* LEFT: standings / setup progress */}
+            <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-5 flex flex-col gap-4 self-start">
+              <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">
+                {isSetupPhase ? 'Setup Progress' : 'Standings'}
+              </span>
+
+              {isSetupPhase ? setupProgress : (
+                <>
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-200 bg-[#0A0D14]"
+                    style={{ borderColor: isMyTurn ? `${COLOR_MAP[me.color]}99` : '#161C27' }}>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0"
+                      style={{ background: COLOR_MAP[me.color] }}>
+                      {me.name[0]}
+                    </div>
+                    <span className="f-body text-base flex-1 text-[#F0E6CC]">
+                      {me.name}
+                      <span className="f-cinzel text-[9px] text-[#C8861A] tracking-widest uppercase ml-2">you</span>
+                    </span>
+                    <span className="f-cinzel text-xs text-[#8A9AB8]">{myTotalCards} cards</span>
+                    <span className="f-cinzel text-sm font-bold text-[#C8861A]">{me.victoryPoints} VP</span>
+                  </div>
+                  {playerList}
+                </>
+              )}
+            </div>
+
+            {/* CENTER: board camera */}
+            <div className="flex flex-col gap-4">
+              <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Physical Board</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      streamStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
+                      streamStatus === 'error'     ? 'bg-red-500' :
+                      streamStatus === 'host_gone' ? 'bg-yellow-400 animate-pulse' :
+                                                     'bg-yellow-400 animate-pulse'
+                    }`} />
+                    <span className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99]">
+                      {streamStatus === 'connected' ? 'Live stream' :
+                       streamStatus === 'host_gone' ? 'Host disconnected' :
+                       streamStatus === 'error'     ? 'Stream error' : 'Connecting…'}
+                    </span>
+                  </div>
+                </div>
+                <BoardCamera
+                  streamStatus={streamStatus}
+                  videoRef={boardVideoRef}
+                  onRetry={startRTCSession}
+                />
+              </div>
+
+              {/* Setup instruction card floats below board on desktop */}
+              {isSetupPhase && isMyTurn && setupInstructionCard}
+
+              {/* Waiting card when not your setup turn */}
+              {isSetupPhase && !isMyTurn && (
+                <div className="flex items-center justify-center py-6 rounded-xl border border-[#2A3347] bg-[#0A0D14]">
+                  <div className="text-center space-y-2">
+                    <div className="text-3xl opacity-30">⏳</div>
+                    <p className="f-cinzel text-xs text-[#6B7A99] tracking-widest uppercase">
+                      {currentTurnPlayer.name} is placing pieces
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT: resources + actions */}
+            <div className="rounded-xl border border-[#2A3347] bg-[#161C27] p-5 flex flex-col gap-5 self-start">
+              {!isSetupPhase && (
+                <>
+                  <div className="flex items-baseline justify-between">
+                    <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Resources</span>
+                    <span className="f-body text-sm text-[#8A9AB8]">{myTotalCards} cards</span>
+                  </div>
+                  {resourceGrid}
+                </>
+              )}
+              <div className="flex-1" />
+              {buildPanel}
+              {tradePanel}
+              {isSetupPhase ? setupActionBar : actionBar}
+            </div>
+
+          </div>
         </div>
       </div>
-
     </div>
   )
 }

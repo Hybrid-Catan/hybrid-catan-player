@@ -129,7 +129,7 @@ export default function JoinRoomPage() {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
     pcRef.current = pc
 
-    // We don't render video here — the game page does.
+    // We don't render video here - the game page does.
     // We just complete the handshake and store the peer connection state
     // in sessionStorage flags so the game page knows a connection is live.
     pc.ontrack = () => {

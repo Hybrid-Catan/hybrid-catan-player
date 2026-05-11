@@ -357,7 +357,7 @@ export default function HybridCatanLanding() {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <HexBtn primary onClick={() => router.push('/host')}>⚔️ Start a Game</HexBtn>
+            <HexBtn primary onClick={() => window.location.href = 'http://localhost:3000'}>⚔️ Start a Game</HexBtn>
             <HexBtn>▶ Watch Demo</HexBtn>
           </div>
 

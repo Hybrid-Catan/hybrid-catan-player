@@ -98,7 +98,7 @@ export default function JoinRoomPage() {
     if (data.success) {
       setGameState(data.data)
       const myPlayer = data.data.players.find((p: any) => p.name === name && p.color === color)
-      if (myPlayer) setMyPlayerId(myPlayer.playerId)
+      if (myPlayer) setMyPlayerId(myPlayer.playerId) 
     }
   }
 
@@ -219,66 +219,68 @@ export default function JoinRoomPage() {
             <h1 className="f-title text-3xl text-white mb-2">Join Game</h1>
             <p className="f-body text-[#8A9AB8] text-base">Choose your color and enter your name</p>
           </div>
+          {!myPlayerId && (
+            <>
+            {/* color + name form */}
+            <div className="rounded-xl border border-[#1E2D42] bg-[#0E1520] p-6 mb-4">
+              <div className="mb-6">
+                <label className="f-cinzel block text-[11px] text-[#F0C060] tracking-[0.35em] uppercase mb-3">
+                  Choose Your Color
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {COLORS.map(c => {
+                    const taken = takenColors.has(c.id)
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => !taken && setColor(c.id)}
+                        disabled={taken}
+                        className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center gap-1 transition-all duration-200
+                          ${taken
+                            ? 'bg-[#0E1117] border-[#2A3347] opacity-30 cursor-not-allowed'
+                            : color === c.id
+                              ? `${c.bg} ${c.border}`
+                              : 'bg-[#0E1117] border-[#2A3347] hover:border-[#3A4A5A]'
+                          }`}
+                      >
+                        <div className="w-4 h-4 rounded-full mx-auto" style={{ background: c.dot }} />
+                        <span className="f-cinzel text-[10px] font-bold tracking-widest uppercase text-[#8A9AB8]">
+                          {taken ? 'Taken' : c.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
 
-          {/* color + name form */}
-          <div className="rounded-xl border border-[#1E2D42] bg-[#0E1520] p-6 mb-4">
-            <div className="mb-6">
-              <label className="f-cinzel block text-[11px] text-[#F0C060] tracking-[0.35em] uppercase mb-3">
-                Choose Your Color
-              </label>
-              <div className="grid grid-cols-4 gap-2">
-                {COLORS.map(c => {
-                  const taken = takenColors.has(c.id)
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => !taken && setColor(c.id)}
-                      disabled={taken}
-                      className={`h-14 rounded-lg border-2 flex flex-col items-center justify-center gap-1 transition-all duration-200
-                        ${taken
-                          ? 'bg-[#0E1117] border-[#2A3347] opacity-30 cursor-not-allowed'
-                          : color === c.id
-                            ? `${c.bg} ${c.border}`
-                            : 'bg-[#0E1117] border-[#2A3347] hover:border-[#3A4A5A]'
-                        }`}
-                    >
-                      <div className="w-4 h-4 rounded-full mx-auto" style={{ background: c.dot }} />
-                      <span className="f-cinzel text-[10px] font-bold tracking-widest uppercase text-[#8A9AB8]">
-                        {taken ? 'Taken' : c.label}
-                      </span>
-                    </button>
-                  )
-                })}
+              <div>
+                <label className="f-cinzel block text-[11px] text-[#F0C060] tracking-[0.35em] uppercase mb-2">
+                  Your Name
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="e.g. Alex"
+                  className="w-full bg-[#070A10] border border-[#1E2D42] rounded-lg px-4 py-3 text-[#F0E6CC] text-sm transition-all duration-200"
+                />
               </div>
             </div>
 
-            <div>
-              <label className="f-cinzel block text-[11px] text-[#F0C060] tracking-[0.35em] uppercase mb-2">
-                Your Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="e.g. Alex"
-                className="w-full bg-[#070A10] border border-[#1E2D42] rounded-lg px-4 py-3 text-[#F0E6CC] text-sm transition-all duration-200"
-              />
-            </div>
-          </div>
-
-          {/* join button */}
-          <button
-            onClick={handleJoin}
-            disabled={!canJoin}
-            className={`f-cinzel w-full py-4 rounded-xl text-sm font-bold tracking-[0.2em] uppercase transition-all duration-500 ease-out mb-4
-              ${canJoin
-                ? 'bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#060A10] hover:from-[#E0A030] hover:to-[#B87818] hover:shadow-[0_4px_20px_rgba(200,134,26,0.45)] active:opacity-80'
-                : 'bg-[#0E1520] text-[#2A3A50] border border-[#1E2D42] cursor-not-allowed'
-              }`}
-          >
-            Join Game →
-          </button>
-
+            {/* join button */}
+            <button
+              onClick={handleJoin}
+              disabled={!canJoin}
+              className={`f-cinzel w-full py-4 rounded-xl text-sm font-bold tracking-[0.2em] uppercase transition-all duration-500 ease-out mb-4
+                ${canJoin
+                  ? 'bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#060A10] hover:from-[#E0A030] hover:to-[#B87818] hover:shadow-[0_4px_20px_rgba(200,134,26,0.45)] active:opacity-80'
+                  : 'bg-[#0E1520] text-[#2A3A50] border border-[#1E2D42] cursor-not-allowed'
+                }`}
+            >
+              Join Game →
+            </button>
+            </>
+          )}
           <div className="lg:hidden mt-4">
             <PlayerLobby gameState={gameState} name={name} colorId={color} />
           </div>

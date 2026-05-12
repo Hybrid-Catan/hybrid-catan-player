@@ -167,9 +167,9 @@ export default function GamePage() {
 
   const [gameState, setGameState] = useState<GameState | null>(null)
   const [dice, setDice] = useState<[number, number]>([1, 1])
-  const [resources, setResources] = useState<Record<ResourceId, number>>(
-    { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 }
-  )
+  // const [resources, setResources] = useState<Record<ResourceId, number>>(
+  //   { WOOD: 0, BRICK: 0, WOOL: 0, WHEAT: 0, ORE: 0 }
+  // )
   const [setupStep, setSetupStep] = useState<'settlement' | 'road'>('settlement')
   const [buildOpen, setBuildOpen] = useState(false)
   const [tradeOpen, setTradeOpen] = useState(false)
@@ -193,19 +193,25 @@ export default function GamePage() {
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('idle')
 
   // ── Game polling ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    async function load() {
-      const data = await getGame(room)
-      if (data.success) {
-        setGameState(data.data)
-        const player = data.data.players.find((p: any) => p.playerId === myPlayerId)
-        if (player) setResources(player.resourceCards as Record<ResourceId, number>)
-      }
-    }
-    load()
-    const interval = setInterval(load, 2000)
-    return () => clearInterval(interval)
-  }, [room])
+useEffect(() => {
+  let isMounted = true
+
+  async function load() {
+    const data = await getGame(room)
+
+    if (!data?.success || !isMounted) return
+
+    setGameState(data.data)
+  }
+
+  load()
+  const interval = setInterval(load, 2000)
+
+  return () => {
+    isMounted = false
+    clearInterval(interval)
+  }
+}, [room])
 
   // ── WebRTC session ────────────────────────────────────────────────────────
   function startRTCSession() {
@@ -353,6 +359,14 @@ export default function GamePage() {
   const isMyTurn = currentTurnPlayer.playerId === myPlayerId
   const myPlayer = gameState.players.find(p => p.playerId === myPlayerId) ?? gameState.players[0]
   const otherPlayers = gameState.players.filter(p => p.playerId !== myPlayerId)
+  const resources =
+  (myPlayer?.resourceCards as Record<ResourceId, number>) ?? {
+    WOOD: 0,
+    BRICK: 0,
+    WOOL: 0,
+    WHEAT: 0,
+    ORE: 0,
+  }
 
   const me = {
     name: myPlayer.name,
@@ -494,15 +508,15 @@ export default function GamePage() {
             </div>
           </div>
           <button disabled={!bankCanTrade}
-            onClick={() => {
-              if (!bankGive || !bankGet) return
-              setResources(prev => ({
-                ...prev,
-                [bankGive]: prev[bankGive] - 4,
-                [bankGet]: prev[bankGet] + 1,
-              }))
-              setBankGive(null); setBankGet(null); setTradeOpen(false)
-            }}
+            // onClick={() => {
+            //   if (!bankGive || !bankGet) return
+            //   setResources(prev => ({
+            //     ...prev,
+            //     [bankGive]: prev[bankGive] - 4,
+            //     [bankGet]: prev[bankGet] + 1,
+            //   }))
+            //   setBankGive(null); setBankGet(null); setTradeOpen(false)
+            // }}
             className={`w-full py-3 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase transition-all
               ${bankCanTrade ? 'bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#0E1117] active:scale-[0.98]' : 'bg-[#0A0D14] border border-[#161C27] text-[#2A3347] cursor-not-allowed'}`}>
             Confirm Trade

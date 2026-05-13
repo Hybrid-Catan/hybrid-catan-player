@@ -12,6 +12,7 @@ import { acceptTrade } from "@/lib/api/trading/accept";
 import { rejectTrade } from "@/lib/api/trading/reject";
 import { endTurn } from "@/lib/api/turn/end";
 import { newTrade } from "@/lib/api/trading/new";
+import { bankTrade } from "@/lib/api/trading/bank";
 
 const COLOR_MAP: Record<Player['color'], string> = {
   RED: '#ef4444',
@@ -524,15 +525,13 @@ useEffect(() => {
             </div>
           </div>
           <button disabled={!bankCanTrade}
-            // onClick={() => {
-            //   if (!bankGive || !bankGet) return
-            //   setResources(prev => ({
-            //     ...prev,
-            //     [bankGive]: prev[bankGive] - 4,
-            //     [bankGet]: prev[bankGet] + 1,
-            //   }))
-            //   setBankGive(null); setBankGet(null); setTradeOpen(false)
-            // }}
+            onClick={async () => {
+              if (!bankGive || !bankGet) return
+              const result = await bankTrade(gameState, myPlayerId, bankGive, bankGet)
+              if (!result.success) { alert(result.error); return }
+              setGameState(result.data)
+              setBankGive(null); setBankGet(null); setTradeOpen(false)
+            }}
             className={`w-full py-3 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase transition-all
               ${bankCanTrade ? 'bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#0E1117] active:scale-[0.98]' : 'bg-[#0A0D14] border border-[#161C27] text-[#2A3347] cursor-not-allowed'}`}>
             Confirm Trade

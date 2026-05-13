@@ -99,6 +99,7 @@ function BoardCamera({
         ref={videoRef}
         autoPlay
         playsInline
+        muted
         className={`w-full h-full object-contain transition-opacity duration-500 ${streamStatus === 'connected' ? 'opacity-100' : 'opacity-0'}`}
       />
 
@@ -191,6 +192,16 @@ export default function GamePage() {
   const playerColorRef = useRef<string>('')
 
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('idle')
+  const retryCountRef = useRef(0)
+
+  const [isLargeScreen, setIsLargeScreen] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const update = () => setIsLargeScreen(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
 
   // ── Game polling ──────────────────────────────────────────────────────────
 useEffect(() => {
@@ -242,7 +253,9 @@ useEffect(() => {
       const [stream] = event.streams
       if (boardVideoRef.current) {
         boardVideoRef.current.srcObject = stream
+        boardVideoRef.current.play().catch(err => console.warn('[RTC] video.play() failed:', err))
       }
+      retryCountRef.current = 0
       setStreamStatus('connected')
     }
 
@@ -326,7 +339,14 @@ useEffect(() => {
       }
     }
 
-    socket.onerror = () => setStreamStatus('error')
+    socket.onerror = () => {
+      if (retryCountRef.current < 5) {
+        retryCountRef.current++
+        setTimeout(() => startRTCSession(), 1000)
+      } else {
+        setStreamStatus('error')
+      }
+    }
     socket.onclose  = () => {
       // Only flag as error if we were previously live — avoids false alarms on clean unmount
       setStreamStatus(prev => prev === 'connected' ? 'host_gone' : prev)
@@ -893,7 +913,7 @@ useEffect(() => {
       `}</style>
 
       {/* ════ MOBILE ════ */}
-      <div className="flex flex-col min-h-screen lg:hidden">
+      {!isLargeScreen && <div className="flex flex-col min-h-screen">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A3347]">
@@ -991,10 +1011,10 @@ useEffect(() => {
             <div className="px-5 pb-6">{actionBar}</div>
           </>
         )}
-      </div>
+      </div>}
 
       {/* ════ DESKTOP ════ */}
-      <div className="hidden lg:block relative min-h-screen">
+      {isLargeScreen && <div className="relative min-h-screen">
 
         <svg className="absolute inset-0 w-full h-full pointer-events-none hex-fade" xmlns="http://www.w3.org/2000/svg">
           {Array.from({ length: 7 }, (_, row) =>
@@ -1155,7 +1175,7 @@ useEffect(() => {
 
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   )
 }

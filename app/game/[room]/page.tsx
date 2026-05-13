@@ -1149,6 +1149,7 @@ useEffect(() => {
               <div className="flex-1" />
               {buildPanel}
               {tradePanel}
+              {incomingTradePanel}
               {isSetupPhase ? setupActionBar : actionBar}
             </div>
 

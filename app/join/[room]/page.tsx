@@ -118,11 +118,7 @@ export default function JoinRoomPage() {
   useEffect(() => {
     if (!myPlayerId || myPlayerIndex === null) return
 
-    const wsUrl = process.env.NEXT_PUBLIC_HOST_WS
-    if (!wsUrl) {
-      console.warn('[RTC] NEXT_PUBLIC_HOST_WS not set — skipping WebRTC handshake')
-      return
-    }
+    const wsUrl = process.env.NEXT_PUBLIC_HOST_WS ?? `ws://${window.location.hostname}:3000/ws`
 
     // Store player info in sessionStorage so /game/[room] can pick it up
     sessionStorage.setItem(`hc_playerId_${roomId}`, myPlayerId)

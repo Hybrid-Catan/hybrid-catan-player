@@ -215,11 +215,7 @@ useEffect(() => {
 
   // ── WebRTC session ────────────────────────────────────────────────────────
   function startRTCSession() {
-    const wsUrl = process.env.NEXT_PUBLIC_HOST_WS
-    if (!wsUrl) {
-      console.warn('[RTC] NEXT_PUBLIC_HOST_WS not set — skipping board stream')
-      return
-    }
+    const wsUrl = process.env.NEXT_PUBLIC_HOST_WS ?? `ws://${window.location.hostname}:3000/ws`
 
     // Read player context set by the join page
     const storedIndex = sessionStorage.getItem(`hc_playerIndex_${room}`)

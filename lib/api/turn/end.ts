@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:3000";
+import { BASE_URL } from "@/lib/api/config";
 import type { GameState } from "@/utils/types";
 
 export async function endTurn(gameState: GameState) {

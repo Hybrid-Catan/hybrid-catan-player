@@ -205,25 +205,25 @@ export default function GamePage() {
   }, [])
 
   // ── Game polling ──────────────────────────────────────────────────────────
-useEffect(() => {
-  let isMounted = true
+  useEffect(() => {
+    let isMounted = true
 
-  async function load() {
-    const data = await getGame(room)
+    async function load() {
+      const data = await getGame(room)
 
-    if (!data?.success || !isMounted) return
+      if (!data?.success || !isMounted) return
 
-    setGameState(data.data)
-  }
+      setGameState(data.data)
+    }
 
-  load()
-  const interval = setInterval(load, 2000)
+    load()
+    const interval = setInterval(load, 2000)
 
-  return () => {
-    isMounted = false
-    clearInterval(interval)
-  }
-}, [room])
+    return () => {
+      isMounted = false
+      clearInterval(interval)
+    }
+  }, [room])
 
   // ── WebRTC session ────────────────────────────────────────────────────────
   function startRTCSession() {
@@ -232,7 +232,7 @@ useEffect(() => {
     // Read player context set by the join page
     const storedIndex = sessionStorage.getItem(`hc_playerIndex_${room}`)
     const storedColor = sessionStorage.getItem(`hc_playerColor_${room}`)
-    const storedId    = sessionStorage.getItem(`hc_playerId_${room}`)
+    const storedId = sessionStorage.getItem(`hc_playerId_${room}`)
 
     const playerIndex = storedIndex !== null ? Number(storedIndex) : 1
     const playerColor = storedColor ?? ''
@@ -348,7 +348,7 @@ useEffect(() => {
         setStreamStatus('error')
       }
     }
-    socket.onclose  = () => {
+    socket.onclose = () => {
       // Only flag as error if we were previously live — avoids false alarms on clean unmount
       setStreamStatus(prev => prev === 'connected' ? 'host_gone' : prev)
     }
@@ -377,13 +377,13 @@ useEffect(() => {
   const myPlayer = gameState.players.find(p => p.playerId === myPlayerId) ?? gameState.players[0]
   const otherPlayers = gameState.players.filter(p => p.playerId !== myPlayerId)
   const resources =
-  (myPlayer?.resourceCards as Record<ResourceId, number>) ?? {
-    WOOD: 0,
-    BRICK: 0,
-    WOOL: 0,
-    WHEAT: 0,
-    ORE: 0,
-  }
+    (myPlayer?.resourceCards as Record<ResourceId, number>) ?? {
+      WOOD: 0,
+      BRICK: 0,
+      WOOL: 0,
+      WHEAT: 0,
+      ORE: 0,
+    }
 
   const me = {
     name: myPlayer.name,
@@ -411,9 +411,9 @@ useEffect(() => {
   }
   async function handleBuild(item: string) {
     let result;
-    if (item === 'Road')       result = await buildRoad(gameState)
+    if (item === 'Road') result = await buildRoad(gameState)
     else if (item === 'Settlement') result = await buildSettlement(gameState)
-    else if (item === 'City')  result = await buildCity(gameState)
+    else if (item === 'City') result = await buildCity(gameState)
     if (!result.success) { alert(result.error); return }
     setGameState(result.data)
   }
@@ -423,7 +423,7 @@ useEffect(() => {
     set: (v: Partial<Record<ResourceId, number>>) => void,
     id: ResourceId, delta: number, max?: number
   ) {
-    const cur  = map[id] ?? 0
+    const cur = map[id] ?? 0
     const next = Math.min(Math.max(cur + delta, 0), max ?? Infinity)
     set({ ...map, [id]: next })
   }
@@ -435,7 +435,7 @@ useEffect(() => {
   const resourceGrid = (
     <div className="grid grid-cols-5 gap-2 lg:gap-3">
       {RESOURCES.map(r => {
-        const count  = me.resources[r.id]
+        const count = me.resources[r.id]
         const active = count > 0
         return (
           <div key={r.id}
@@ -490,7 +490,7 @@ useEffect(() => {
             <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">You Give ×4</p>
             <div className="grid grid-cols-5 gap-1.5">
               {RESOURCES.map(r => {
-                const enough   = me.resources[r.id] >= 4
+                const enough = me.resources[r.id] >= 4
                 const selected = bankGive === r.id
                 return (
                   <button key={r.id} disabled={!enough}
@@ -543,7 +543,7 @@ useEffect(() => {
             <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">You Offer</p>
             <div className="grid grid-cols-5 gap-1.5">
               {RESOURCES.map(r => {
-                const given   = offerGive[r.id] ?? 0
+                const given = offerGive[r.id] ?? 0
                 const maxGive = me.resources[r.id]
                 return (
                   <div key={r.id} className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg border border-[#2A3347] bg-[#0A0D14]">
@@ -566,9 +566,9 @@ useEffect(() => {
             <p className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99] mb-2">You Request</p>
             <div className="grid grid-cols-5 gap-1.5">
               {RESOURCES.map(r => {
-                const requested   = offerRequest[r.id] ?? 0
-                const target      = otherPlayers.find(p => p.name === targetPlayer)
-                const maxRequest  = target ? totalCards(target.resourceCards) : 0
+                const requested = offerRequest[r.id] ?? 0
+                const target = otherPlayers.find(p => p.name === targetPlayer)
+                const maxRequest = target ? totalCards(target.resourceCards) : 0
                 return (
                   <div key={r.id} className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg border border-[#2A3347] bg-[#0A0D14]">
                     <span className="text-base leading-none">{r.emoji}</span>
@@ -655,7 +655,7 @@ useEffect(() => {
     <div className="slide-up space-y-2 pt-4 border-t border-[#2A3347]">
       {Object.entries(BUILD_COSTS).map(([item, cost]) => {
         const affordable = canAfford(me.resources, cost)
-        const costStr    = Object.entries(cost).map(([r, n]) => `${n} ${r}`).join(' · ')
+        const costStr = Object.entries(cost).map(([r, n]) => `${n} ${r}`).join(' · ')
         return (
           <button key={item} disabled={!affordable} onClick={() => handleBuild(item)}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all duration-200
@@ -867,7 +867,15 @@ useEffect(() => {
       {isMyTurn ? (
         setupStep === 'settlement' ? (
           <button
-            onClick={() => setSetupStep('road')}
+            onClick={async () => {
+              const result = await buildSettlement(gameState)
+              if (!result.success) {
+                alert(result.error)
+                return
+              }
+              setGameState(result.data)
+              setSetupStep('road')
+            }}
             className="flex-1 py-4 rounded-xl f-cinzel text-sm font-bold tracking-[0.15em] uppercase
               bg-gradient-to-br from-[#D4921E] to-[#A86B10] text-[#0E1117] active:scale-[0.98] transition-all">
             Confirm Settlement ✓
@@ -932,16 +940,15 @@ useEffect(() => {
           <div className="flex items-center justify-between mb-2">
             <span className="f-cinzel text-[10px] tracking-[0.35em] uppercase text-[#8A9AB8]">Board</span>
             <div className="flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                streamStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
-                streamStatus === 'error'     ? 'bg-red-500' :
-                streamStatus === 'host_gone' ? 'bg-yellow-400' :
-                                               'bg-yellow-400 animate-pulse'
-              }`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${streamStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
+                  streamStatus === 'error' ? 'bg-red-500' :
+                    streamStatus === 'host_gone' ? 'bg-yellow-400' :
+                      'bg-yellow-400 animate-pulse'
+                }`} />
               <span className="f-cinzel text-[9px] tracking-widest uppercase text-[#6B7A99]">
                 {streamStatus === 'connected' ? 'Live' :
-                 streamStatus === 'host_gone' ? 'Host gone' :
-                 streamStatus === 'error'     ? 'Error' : 'Connecting…'}
+                  streamStatus === 'host_gone' ? 'Host gone' :
+                    streamStatus === 'error' ? 'Error' : 'Connecting…'}
               </span>
             </div>
           </div>
@@ -959,8 +966,8 @@ useEffect(() => {
             {isMyTurn
               ? <p className="f-cinzel text-sm font-bold text-[#F0C060] amber-glow">Your Turn</p>
               : <p className="f-body text-sm text-[#8A9AB8]">
-                  <span className="font-semibold" style={{ color: COLOR_MAP[currentTurnPlayer.color] }}>{currentTurnPlayer.name}</span>{`'s turn`}
-                </p>
+                <span className="font-semibold" style={{ color: COLOR_MAP[currentTurnPlayer.color] }}>{currentTurnPlayer.name}</span>{`'s turn`}
+              </p>
             }
             <p className="f-cinzel text-[10px] text-[#6B7A99] tracking-widest uppercase mt-0.5">
               {isSetupPhase
@@ -1061,8 +1068,8 @@ useEffect(() => {
               {isMyTurn
                 ? <p className="f-cinzel text-xl font-bold text-[#F0C060] amber-glow">Your Turn</p>
                 : <p className="f-body text-xl text-[#8A9AB8]">
-                    <span className="font-semibold" style={{ color: COLOR_MAP[currentTurnPlayer.color] }}>{currentTurnPlayer.name}</span>{`'s turn`}
-                  </p>
+                  <span className="font-semibold" style={{ color: COLOR_MAP[currentTurnPlayer.color] }}>{currentTurnPlayer.name}</span>{`'s turn`}
+                </p>
               }
               <p className="f-cinzel text-xs text-[#6B7A99] tracking-widest uppercase mt-1">
                 {isSetupPhase
@@ -1118,16 +1125,15 @@ useEffect(() => {
                 <div className="flex items-center justify-between">
                   <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Physical Board</span>
                   <div className="flex items-center gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      streamStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
-                      streamStatus === 'error'     ? 'bg-red-500' :
-                      streamStatus === 'host_gone' ? 'bg-yellow-400 animate-pulse' :
-                                                     'bg-yellow-400 animate-pulse'
-                    }`} />
+                    <span className={`w-1.5 h-1.5 rounded-full ${streamStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
+                        streamStatus === 'error' ? 'bg-red-500' :
+                          streamStatus === 'host_gone' ? 'bg-yellow-400 animate-pulse' :
+                            'bg-yellow-400 animate-pulse'
+                      }`} />
                     <span className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99]">
                       {streamStatus === 'connected' ? 'Live stream' :
-                       streamStatus === 'host_gone' ? 'Host disconnected' :
-                       streamStatus === 'error'     ? 'Stream error' : 'Connecting…'}
+                        streamStatus === 'host_gone' ? 'Host disconnected' :
+                          streamStatus === 'error' ? 'Stream error' : 'Connecting…'}
                     </span>
                   </div>
                 </div>

@@ -5,6 +5,7 @@ import type { GameState, Player } from '@/utils/types'
 import { buildRoad } from "@/lib/api/build/buildRoad";
 import { buildSettlement } from "@/lib/api/build/buildSettlement";
 import { buildCity } from "@/lib/api/build/buildCity";
+import { buildDev } from "@/lib/api/build/buildDev";
 import { getGame } from "@/lib/api/game/getGame";
 import { confirmSetupRoad } from "@/lib/api/turn/setup";
 import { rollDice } from "@/lib/api/turn/buffer";
@@ -35,6 +36,7 @@ const BUILD_COSTS: Record<string, Partial<Record<ResourceId, number>>> = {
   Road: { WOOD: 1, BRICK: 1 },
   Settlement: { WOOD: 1, BRICK: 1, WOOL: 1, WHEAT: 1 },
   City: { WHEAT: 2, ORE: 3 },
+  DevCard: { WHEAT: 1, ORE: 1, WOOL: 1 },
 }
 
 function canAfford(resources: Record<ResourceId, number>, cost: Partial<Record<ResourceId, number>>) {
@@ -414,6 +416,7 @@ export default function GamePage() {
     if (item === 'Road') result = await buildRoad(gameState)
     else if (item === 'Settlement') result = await buildSettlement(gameState)
     else if (item === 'City') result = await buildCity(gameState)
+    else if (item === 'DevCard') result = await buildDev(gameState)
     if (!result.success) { alert(result.error); return }
     setGameState(result.data)
   }
@@ -941,9 +944,9 @@ export default function GamePage() {
             <span className="f-cinzel text-[10px] tracking-[0.35em] uppercase text-[#8A9AB8]">Board</span>
             <div className="flex items-center gap-1.5">
               <span className={`w-1.5 h-1.5 rounded-full ${streamStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
-                  streamStatus === 'error' ? 'bg-red-500' :
-                    streamStatus === 'host_gone' ? 'bg-yellow-400' :
-                      'bg-yellow-400 animate-pulse'
+                streamStatus === 'error' ? 'bg-red-500' :
+                  streamStatus === 'host_gone' ? 'bg-yellow-400' :
+                    'bg-yellow-400 animate-pulse'
                 }`} />
               <span className="f-cinzel text-[9px] tracking-widest uppercase text-[#6B7A99]">
                 {streamStatus === 'connected' ? 'Live' :
@@ -1126,9 +1129,9 @@ export default function GamePage() {
                   <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">Physical Board</span>
                   <div className="flex items-center gap-1.5">
                     <span className={`w-1.5 h-1.5 rounded-full ${streamStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
-                        streamStatus === 'error' ? 'bg-red-500' :
-                          streamStatus === 'host_gone' ? 'bg-yellow-400 animate-pulse' :
-                            'bg-yellow-400 animate-pulse'
+                      streamStatus === 'error' ? 'bg-red-500' :
+                        streamStatus === 'host_gone' ? 'bg-yellow-400 animate-pulse' :
+                          'bg-yellow-400 animate-pulse'
                       }`} />
                     <span className="f-cinzel text-[10px] tracking-widest uppercase text-[#6B7A99]">
                       {streamStatus === 'connected' ? 'Live stream' :
@@ -1177,7 +1180,23 @@ export default function GamePage() {
               {incomingTradePanel}
               {isSetupPhase ? setupActionBar : actionBar}
             </div>
+            <div className="space-y-2">
 
+              <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">
+                Development Cards
+              </span>
+              {Object.entries(myPlayer.developmentCards).map(([type, count]) => {
+                if (count <= 0) return null
+                return (
+                  <button
+                    key={type}
+                    className="..."
+                  >
+                    {type} × {count}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>}

@@ -39,6 +39,40 @@ const BUILD_COSTS: Record<string, Partial<Record<ResourceId, number>>> = {
   DevCard: { WHEAT: 1, ORE: 1, WOOL: 1 },
 }
 
+const DEV_CARD_ORDER = [
+  "KNIGHT",
+  "MONOPOLY",
+  "ROAD_BUILDING",
+  "INVENTION",
+  "VICTORY_POINT",
+] as const;
+
+function formatDevCardName(type: string) {
+  switch (type) {
+    case "KNIGHT":
+      return "Knight"
+    case "MONOPOLY":
+      return "Monopoly"
+    case "ROAD_BUILDING":
+      return "Road Building"
+    case "INVENTION":
+      return "Invention"
+    case "VICTORY_POINT":
+      return "Victory Point"
+    default:
+      return type
+  }
+}
+
+function canPlayDevCard(type: string, gameState: any, playerId: string) {
+  if (gameState.devCardPurchasedThisTurn?.[playerId]) {
+    return false
+  }
+  return (gameState.players
+    .find((p: any) => p.playerId === playerId)
+    ?.developmentCards?.[type] ?? 0) > 0
+}
+
 function canAfford(resources: Record<ResourceId, number>, cost: Partial<Record<ResourceId, number>>) {
   return Object.entries(cost).every(([r, n]) => resources[r as ResourceId] >= (n ?? 0))
 }
@@ -1181,21 +1215,54 @@ export default function GamePage() {
               {isSetupPhase ? setupActionBar : actionBar}
             </div>
             <div className="space-y-2">
-
               <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#8A9AB8]">
                 Development Cards
               </span>
-              {Object.entries(myPlayer.developmentCards).map(([type, count]) => {
-                if (count <= 0) return null
-                return (
-                  <button
-                    key={type}
-                    className="..."
-                  >
-                    {type} × {count}
-                  </button>
-                )
-              })}
+              <div className="space-y-2">
+                {DEV_CARD_ORDER.map((type) => {
+                  const count = myPlayer.developmentCards[type]
+                  if (!count) return null
+                  const canPlay = canPlayDevCard(type, gameState, myPlayerId)
+                  return (
+                    <div
+                      key={type}
+                      className="flex items-center justify-between px-3 py-2 rounded-lg border border-[#2A3347] bg-[#0A0D14]"
+                    >
+                      {/* LEFT */}
+                      <div className="flex flex-col">
+                        <span className="f-cinzel text-xs text-[#F0E6CC] tracking-wide">
+                          {formatDevCardName(type)}
+                        </span>
+                        {/* shared rule warning */}
+                        {!canPlay && gameState.devCardPurchasedThisTurn?.[myPlayerId] && (
+                          <span className="text-[10px] text-red-400">
+                            Cannot play this turn
+                          </span>
+                        )}
+                      </div>
+                      {/* RIGHT */}
+                      <div className="flex items-center gap-2">
+                        <span className="f-cinzel text-sm font-bold text-[#38BDF8]">
+                          × {count}
+                        </span>
+                        <button
+                          disabled={!canPlay}
+                          onClick={() => {
+                            console.log(`Attempt play: ${type}`)
+                          }}
+                          className={`px-2 py-1 text-[10px] rounded border transition-all
+                ${canPlay
+                              ? "border-[#38BDF8] text-[#38BDF8] hover:bg-[#38BDF8]/10"
+                              : "border-[#2A3347] text-[#2A3347] cursor-not-allowed"
+                            }`}
+                        >
+                          Play
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>

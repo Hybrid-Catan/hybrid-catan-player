@@ -19,13 +19,6 @@ export type Player = {
         "INVENTION": number,
         "VICTORY_POINT": number
     },
-    "newDevelopmentCards": {
-      "KNIGHT": number,
-      "MONOPOLY": number,
-      "ROAD_BUILDING": number,
-      "INVENTION": number,
-      "VICTORY_POINT": number
-    },
     "pieces": {
         "settlementsPlaced": number,
         "citiesPlaced": number,
@@ -51,11 +44,9 @@ export type GameState = {
     "status": "SETUP" | "IN_PROGRESS" | "FINISHED",
     "players": Player[], // in queue
     "phase": "SETUP_1" | "SETUP_2" | "BUFFER" | "ROLL" | "TRADE" | "BUILD" | "ROAD_BUILDING" | "END",
-
     "dice": {
         "sum": number
     },
-
     "bank": {
         "resources": {
             "WOOD": number,
@@ -66,7 +57,6 @@ export type GameState = {
         },
         "developmentCardsRemaining": number
     },
-
     "developmentDeck": {
         "KNIGHT": number,
         "MONOPOLY": number,
@@ -74,7 +64,6 @@ export type GameState = {
         "INVENTION": number,
         "VICTORY_POINT": number
     },
-
     "tradeState": {
         "Trades": {
             "player1": UUID,
@@ -92,6 +81,7 @@ export type GameState = {
     },
     "pendingFreeRoads": number,
     "largestArmyPlayerId"?: string,
+    "devCardPurchasedThisTurn": Record<UUID, boolean>;
     "winner": {
         "playerId": UUID,
     }

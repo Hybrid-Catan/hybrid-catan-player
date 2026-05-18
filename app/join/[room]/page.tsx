@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from 'next/navigation'
 import { getGame } from '@/lib/api/game/getGame'
 import { addPlayer } from '@/lib/api/game/addPlayer'
-import { startGame } from '@/lib/api/game/startGame'
+import { BASE_URL } from '@/lib/api/config'
 
 const COLORS = [
   { id: 'RED', label: 'Red', dot: '#ef4444', bg: 'bg-red-500/20', border: 'border-red-500/60', playerIndex: 0 },
@@ -33,15 +33,21 @@ function PlayerLobby({ gameState, name, colorId }: any) {
       <div className="divide-y divide-[#1A2235]">
         {gameState?.players?.map((p: any) => {
           const color = COLORS.find(c => c.id === p.color)?.dot || '#fff'
+          const isHost = p.sequence === 1
           return (
             <div key={p.playerId} className="flex items-center gap-3 px-5 py-3">
               <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black text-white flex-shrink-0"
                 style={{ background: color }}
               >
                 {p.name[0]}
               </div>
               <span className="f-body text-sm text-[#F0E6CC] flex-1">{p.name}</span>
+              {isHost && (
+                <span className="f-cinzel text-[9px] tracking-widest uppercase px-2 py-0.5 rounded border border-[#C8861A]/50 text-[#C8861A] bg-[#C8861A]/10">
+                  Host
+                </span>
+              )}
               <span className="f-cinzel text-[10px] text-emerald-400">Joined</span>
             </div>
           )
@@ -83,6 +89,7 @@ export default function JoinRoomPage() {
   const [gameState, setGameState] = useState<any>(null)
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null)
   const [myPlayerIndex, setMyPlayerIndex] = useState<number | null>(null)
+  const [mySequence, setMySequence] = useState<number | null>(null)
   const [rtcStatus, setRtcStatus] = useState<RTCStatus>('idle')
 
   const pcRef = useRef<RTCPeerConnection | null>(null)
@@ -204,6 +211,8 @@ export default function JoinRoomPage() {
       } else if (data.type === 'host_disconnected') {
         setRtcStatus('error')
         if (pcRef.current) pcRef.current.close()
+      } else if (data.type === 'game_start') {
+        router.push(`/game/${roomId}?playerId=${myPlayerId}`)
       }
     }
 
@@ -241,6 +250,7 @@ export default function JoinRoomPage() {
       const myPlayer = data.data.players.find((p: any) => p.name === name && p.color === color)
       if (myPlayer) {
         setMyPlayerId(myPlayer.playerId)
+        setMySequence(myPlayer.sequence)
         const colorMeta = COLORS.find(c => c.id === color)
         setMyPlayerIndex(colorMeta?.playerIndex ?? gameState.players.length + 1)
       }
@@ -248,9 +258,17 @@ export default function JoinRoomPage() {
   }
 
   const handleStart = async () => {
-    const data = await startGame(gameState)
-    if (data.success) {
-      router.push(`/game/${roomId}?playerId=${myPlayerId}`)
+    const res = await fetch(`${BASE_URL}/api/init/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gameId: roomId }),
+    })
+    const data = await res.json()
+    if (!data.success) return
+
+    const socket = socketRef.current
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'game_start', gameId: roomId }))
     }
   }
 
@@ -463,14 +481,14 @@ export default function JoinRoomPage() {
 
           <button
             onClick={handleStart}
-            disabled={!myPlayerId}
+            disabled={!myPlayerId || mySequence !== 1}
             className={`w-full p-4 rounded-xl font-bold mt-10 f-cinzel text-sm tracking-[0.15em] uppercase transition-all duration-300
-              ${myPlayerId
+              ${myPlayerId && mySequence === 1
                 ? 'bg-gradient-to-br from-emerald-600 to-emerald-800 text-white hover:from-emerald-500 hover:to-emerald-700 hover:shadow-[0_4px_20px_rgba(16,185,129,0.3)] active:opacity-80'
                 : 'bg-[#0E1520] border border-[#1E2D42] text-[#2A3A50] cursor-not-allowed opacity-40'
               }`}
           >
-            Start Game →
+            {mySequence === 1 ? 'Start Game →' : 'Waiting for host to start…'}
           </button>
         </div>
       </div>

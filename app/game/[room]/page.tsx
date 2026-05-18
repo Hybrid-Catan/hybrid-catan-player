@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
-import type { GameState, Player } from '@/utils/types'
+import type { DevelopmentCardType, GameState, Player } from '@/utils/types'
 import { buildRoad } from "@/lib/api/build/buildRoad";
 import { buildSettlement } from "@/lib/api/build/buildSettlement";
 import { buildCity } from "@/lib/api/build/buildCity";
@@ -68,13 +68,22 @@ function formatDevCardName(type: string) {
   }
 }
 
-function canPlayDevCard(type: string, gameState: any, playerId: string) {
-  if (gameState.devCardPurchasedThisTurn?.[playerId]) {
+function canPlayDevCard(
+  type: DevelopmentCardType,
+  gameState: GameState,
+  playerId: string
+): boolean {
+  const player = gameState.players.find(p => p.playerId === playerId)
+  if (!player) {
     return false
   }
-  return (gameState.players
-    .find((p: any) => p.playerId === playerId)
-    ?.developmentCards?.[type] ?? 0) > 0
+  if (player.developmentCards[type] <= 0) {
+    return false
+  }
+  if ((player.newDevelopmentCards[type] ?? 0) > 0) {
+    return false
+  }
+  return true
 }
 
 function canAfford(resources: Record<ResourceId, number>, cost: Partial<Record<ResourceId, number>>) {
@@ -1262,7 +1271,11 @@ export default function GamePage() {
                 {DEV_CARD_ORDER.map((type) => {
                   const count = myPlayer.developmentCards[type]
                   if (!count) return null
+                  const player = gameState.players.find(p => p.playerId === myPlayerId)
+                  const isNewCard = (player?.newDevelopmentCards?.[type] ?? 0) > 0
                   const canPlay = canPlayDevCard(type, gameState, myPlayerId)
+                  const isLockedByTurn = myPlayer.devCardPlayedThisTurn
+                  const disabled = !canPlay || isLockedByTurn
                   return (
                     <div
                       key={type}
@@ -1274,7 +1287,7 @@ export default function GamePage() {
                           {formatDevCardName(type)}
                         </span>
                         {/* shared rule warning */}
-                        {!canPlay && gameState.devCardPurchasedThisTurn?.[myPlayerId] && (
+                        {!canPlay && isNewCard && (
                           <span className="text-[10px] text-red-400">
                             Cannot play this turn
                           </span>
@@ -1286,12 +1299,12 @@ export default function GamePage() {
                           × {count}
                         </span>
                         <button
-                          disabled={!canPlay}
+                          disabled={disabled}
                           onClick={() => handlePlayDevCard(type)}
                           className={`px-2 py-1 text-[10px] rounded border transition-all
-                ${canPlay
-                              ? "border-[#38BDF8] text-[#38BDF8] hover:bg-[#38BDF8]/10"
-                              : "border-[#2A3347] text-[#2A3347] cursor-not-allowed"
+                            ${disabled
+                              ? "border-[#2A3347] text-[#2A3347] cursor-not-allowed"
+                              : "border-[#38BDF8] text-[#38BDF8] hover:bg-[#38BDF8]/10"
                             }`}
                         >
                           Play
@@ -1358,11 +1371,10 @@ export default function GamePage() {
                         setPickedResources(next)
                       }
                     }}
-                    className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
-                      pickedResources.length >= 2
-                        ? 'border-[#1A2235] bg-[#0A0D14] opacity-35 cursor-not-allowed'
-                        : 'border-[#2A3347] bg-[#0A0D14] hover:bg-[#38BDF8]/10 hover:border-[#38BDF8]/40'
-                    }`}
+                    className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${pickedResources.length >= 2
+                      ? 'border-[#1A2235] bg-[#0A0D14] opacity-35 cursor-not-allowed'
+                      : 'border-[#2A3347] bg-[#0A0D14] hover:bg-[#38BDF8]/10 hover:border-[#38BDF8]/40'
+                      }`}
                   >
                     <span className="f-cinzel text-sm text-[#F0E6CC]">{r.emoji} {r.label}</span>
                     {count > 0 && (

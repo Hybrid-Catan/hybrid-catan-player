@@ -1,5 +1,12 @@
 type UUID = string;
 
+export type DevelopmentCardType =
+    | "KNIGHT"
+    | "MONOPOLY"
+    | "ROAD_BUILDING"
+    | "INVENTION"
+    | "VICTORY_POINT";
+
 export type Player = {
     "playerId": UUID,
     "name": string,
@@ -12,13 +19,9 @@ export type Player = {
         "WHEAT": number,
         "ORE": number
     },
-    "developmentCards": {
-        "KNIGHT": number,
-        "MONOPOLY": number,
-        "ROAD_BUILDING": number,
-        "INVENTION": number,
-        "VICTORY_POINT": number
-    },
+    "developmentCards": Record<DevelopmentCardType, number>
+    "newDevelopmentCards": Partial<Record<DevelopmentCardType, number>>
+    "devCardPlayedThisTurn": boolean,
     "pieces": {
         "settlementsPlaced": number,
         "citiesPlaced": number,
@@ -81,7 +84,6 @@ export type GameState = {
     },
     "pendingFreeRoads": number,
     "largestArmyPlayerId"?: string,
-    "devCardPurchasedThisTurn": Record<UUID, boolean>;
     "winner": {
         "playerId": UUID,
     }

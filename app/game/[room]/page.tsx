@@ -14,6 +14,10 @@ import { rejectTrade } from "@/lib/api/trading/reject";
 import { endTurn } from "@/lib/api/turn/end";
 import { newTrade } from "@/lib/api/trading/new";
 import { bankTrade } from "@/lib/api/trading/bank";
+import { playKnight } from "@/lib/api/devCard/playKnight";
+import { playRoadBuilding } from "@/lib/api/devCard/playRoadBuilding";
+import { playMonopoly } from "@/lib/api/devCard/playMonopoly";
+import { playInvention } from "@/lib/api/devCard/playInvention";
 
 const COLOR_MAP: Record<Player['color'], string> = {
   RED: '#ef4444',
@@ -218,6 +222,8 @@ export default function GamePage() {
   const [offerRequest, setOfferRequest] = useState<Partial<Record<ResourceId, number>>>({})
   const [targetPlayer, setTargetPlayer] = useState<string | null>(null)
   const [sentOffer, setSentOffer] = useState<string | null>(null)
+  const [devCardModal, setDevCardModal] = useState<'MONOPOLY' | 'INVENTION' | null>(null)
+  const [pickedResources, setPickedResources] = useState<ResourceId[]>([])
 
   // ── WebRTC ────────────────────────────────────────────────────────────────
   const boardVideoRef = useRef<HTMLVideoElement | null>(null)
@@ -451,6 +457,40 @@ export default function GamePage() {
     else if (item === 'Settlement') result = await buildSettlement(gameState)
     else if (item === 'City') result = await buildCity(gameState)
     else if (item === 'DevCard') result = await buildDev(gameState)
+    if (!result.success) { alert(result.error); return }
+    setGameState(result.data)
+  }
+
+  async function handlePlayDevCard(type: string) {
+    if (type === 'KNIGHT') {
+      const result = await playKnight(gameState)
+      if (!result.success) { alert(result.error); return }
+      setGameState(result.data)
+    } else if (type === 'ROAD_BUILDING') {
+      const result = await playRoadBuilding(gameState)
+      if (!result.success) { alert(result.error); return }
+      setGameState(result.data)
+    } else if (type === 'MONOPOLY') {
+      setPickedResources([])
+      setDevCardModal('MONOPOLY')
+    } else if (type === 'INVENTION') {
+      setPickedResources([])
+      setDevCardModal('INVENTION')
+    }
+  }
+
+  async function confirmMonopoly(resource: ResourceId) {
+    const result = await playMonopoly(gameState, resource)
+    setDevCardModal(null)
+    setPickedResources([])
+    if (!result.success) { alert(result.error); return }
+    setGameState(result.data)
+  }
+
+  async function confirmInvention(r1: ResourceId, r2: ResourceId) {
+    const result = await playInvention(gameState, r1, r2)
+    setDevCardModal(null)
+    setPickedResources([])
     if (!result.success) { alert(result.error); return }
     setGameState(result.data)
   }
@@ -1247,9 +1287,7 @@ export default function GamePage() {
                         </span>
                         <button
                           disabled={!canPlay}
-                          onClick={() => {
-                            console.log(`Attempt play: ${type}`)
-                          }}
+                          onClick={() => handlePlayDevCard(type)}
                           className={`px-2 py-1 text-[10px] rounded border transition-all
                 ${canPlay
                               ? "border-[#38BDF8] text-[#38BDF8] hover:bg-[#38BDF8]/10"
@@ -1267,6 +1305,82 @@ export default function GamePage() {
           </div>
         </div>
       </div>}
+
+      {devCardModal === 'MONOPOLY' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setDevCardModal(null)}>
+          <div className="w-full max-w-sm rounded-xl border-2 border-[#38BDF8]/40 bg-[#0A0D14] p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div>
+              <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#38BDF8] block">Monopoly</span>
+              <p className="f-body text-sm text-[#F0E6CC] mt-1">Choose a resource to take from every other player.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {RESOURCES.map(r => (
+                <button
+                  key={r.id}
+                  onClick={() => confirmMonopoly(r.id)}
+                  className="flex items-center justify-between px-4 py-3 rounded-lg border border-[#2A3347] bg-[#0A0D14] hover:bg-[#38BDF8]/10 hover:border-[#38BDF8]/40 transition-all"
+                >
+                  <span className="f-cinzel text-sm text-[#F0E6CC]">{r.emoji} {r.label}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setDevCardModal(null)}
+              className="w-full f-cinzel text-xs text-[#8A9AB8] hover:text-[#F0E6CC] py-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {devCardModal === 'INVENTION' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setDevCardModal(null)}>
+          <div className="w-full max-w-sm rounded-xl border-2 border-[#38BDF8]/40 bg-[#0A0D14] p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div>
+              <span className="f-cinzel text-[11px] tracking-[0.35em] uppercase text-[#38BDF8] block">Year of Plenty</span>
+              <p className="f-body text-sm text-[#F0E6CC] mt-1">
+                Pick 2 resources to take from the bank. Selected: {pickedResources.length} / 2
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {RESOURCES.map(r => {
+                const count = pickedResources.filter(p => p === r.id).length
+                return (
+                  <button
+                    key={r.id}
+                    disabled={pickedResources.length >= 2}
+                    onClick={() => {
+                      const next = [...pickedResources, r.id]
+                      if (next.length === 2) {
+                        confirmInvention(next[0], next[1])
+                      } else {
+                        setPickedResources(next)
+                      }
+                    }}
+                    className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
+                      pickedResources.length >= 2
+                        ? 'border-[#1A2235] bg-[#0A0D14] opacity-35 cursor-not-allowed'
+                        : 'border-[#2A3347] bg-[#0A0D14] hover:bg-[#38BDF8]/10 hover:border-[#38BDF8]/40'
+                    }`}
+                  >
+                    <span className="f-cinzel text-sm text-[#F0E6CC]">{r.emoji} {r.label}</span>
+                    {count > 0 && (
+                      <span className="f-cinzel text-xs text-[#38BDF8]">× {count}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            <button
+              onClick={() => { setDevCardModal(null); setPickedResources([]) }}
+              className="w-full f-cinzel text-xs text-[#8A9AB8] hover:text-[#F0E6CC] py-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
